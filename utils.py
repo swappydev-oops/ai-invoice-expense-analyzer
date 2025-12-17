@@ -1,4 +1,9 @@
-def extract_invoice_details_from_image(image: Image.Image):
+import google.generativeai as genai
+from categories import EXPENSE_CATEGORIES
+from PIL import Image
+import json
+
+def extract_invoice_details_from_image(image):
     model = genai.GenerativeModel("gemini-1.5-flash")
     genai.configure(api_key=st.secrets["AIzaSyBILsz7OLnwsFgvPOgumnjb74xF1aTGi24"])
 
