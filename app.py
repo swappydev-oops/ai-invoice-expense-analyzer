@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from PIL import image
+from PIL import Image
 from utils import extract_invoice_details_from_image
 
 with st.spinner("Analyzing invoice using AI..."):
