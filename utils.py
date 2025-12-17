@@ -1,27 +1,38 @@
-import pytesseract
-from PIL import Image
 import google.generativeai as genai
-import re
 from categories import EXPENSE_CATEGORIES
+from PIL import Image
+import json
 
 genai.configure(api_key="AIzaSyBILsz7OLnwsFgvPOgumnjb74xF1aTGi24")
 
-def extract_text_from_image(image):
-    return pytesseract.image_to_string(image)
-
-def extract_invoice_details(text):
-    model = genai.GenerativeModel("gemini-pro")
+def extract_invoice_details_from_image(image: Image.Image):
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = f"""
-    Extract invoice details from the text below.
-    Return JSON with keys:
-    invoice_number, vendor, date, total_amount, tax, category
+    You are an accounting assistant.
 
-    Categories: {EXPENSE_CATEGORIES}
+    Extract invoice details from the image.
+    Return ONLY valid JSON with these keys:
+    invoice_number
+    vendor
+    date
+    total_amount
+    tax
+    category
 
-    Text:
-    {text}
+    Category must be one of:
+    {EXPENSE_CATEGORIES}
     """
 
-    response = model.generate_content(prompt)
-    return response.text
+    response = model.generate_content(
+        [prompt, image],
+        generation_config={"temperature": 0}
+    )
+
+    text = response.text.strip()
+
+    # Remove markdown if Gemini adds it
+    if text.startswith("```"):
+        text = text.replace("```json", "").replace("```", "").strip()
+
+    return json.loads(text)

@@ -1,6 +1,4 @@
 streamlit
-pytesseract
 pillow
-pdf2image
 pandas
 google-generativeai
