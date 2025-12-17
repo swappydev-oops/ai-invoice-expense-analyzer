@@ -5,7 +5,7 @@ import json
 genai.configure(api_key="AIzaSyBILsz7OLnwsFgvPOgumnjb74xF1aTGi24")
 
 def extract_invoice_details_from_image(image):
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-pro-vision")
 
     prompt = f"""
     You are an API.
