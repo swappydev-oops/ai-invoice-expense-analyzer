@@ -1,18 +1,17 @@
 import google.generativeai as genai
 from categories import EXPENSE_CATEGORIES
-from PIL import Image
 import json
+
+genai.configure(api_key="AIzaSyBILsz7OLnwsFgvPOgumnjb74xF1aTGi24")
 
 def extract_invoice_details_from_image(image):
     model = genai.GenerativeModel("gemini-1.5-flash")
-    genai.configure(api_key=st.secrets["AIzaSyBILsz7OLnwsFgvPOgumnjb74xF1aTGi24"])
 
     prompt = f"""
     You are an API.
 
     Read the invoice image and return ONLY valid JSON.
     No explanation.
-    No text.
     No markdown.
 
     JSON format (ALL keys mandatory):
@@ -35,8 +34,6 @@ def extract_invoice_details_from_image(image):
     )
 
     raw_text = response.text.strip()
-
-    # Clean markdown if any
     raw_text = raw_text.replace("```json", "").replace("```", "").strip()
 
     return json.loads(raw_text)
