@@ -3,6 +3,12 @@ import sqlite3
 import hashlib
 import time
 
+st.components.v1.iframe(
+    "https://swappydev-oops.github.io/ai-invoice-expense-analyzer/",
+    height=700
+)
+
+
 # ---------------- DB ----------------
 def get_conn():
     return sqlite3.connect("data.db", check_same_thread=False)

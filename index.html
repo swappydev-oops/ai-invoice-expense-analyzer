@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Invoice Analyzer – Login</title>
+
+  <!-- React + Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Inter, Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      background: linear-gradient(120deg, #0f2027, #203a43, #2c5364);
+      background-size: 300% 300%;
+      animation: bgMove 12s ease infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #111;
+    }
+
+    @keyframes bgMove {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .card {
+      width: 380px;
+      background: white;
+      padding: 32px;
+      border-radius: 18px;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.35);
+    }
+
+    h2 {
+      margin: 0;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    p {
+      margin-top: 6px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 14px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 20px;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.95;
+    }
+
+    .toggle {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #4f46e5;
+      cursor: pointer;
+    }
+
+    .invoice {
+      position: absolute;
+      width: 160px;
+      height: 220px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      animation: float 20s linear infinite;
+    }
+
+    @keyframes float {
+      from { transform: translateY(120vh); }
+      to { transform: translateY(-140vh); }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Floating invoice visuals -->
+  <div class="invoice" style="left:10%; animation-duration:18s;"></div>
+  <div class="invoice" style="left:45%; animation-duration:24s;"></div>
+  <div class="invoice" style="left:75%; animation-duration:22s;"></div>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    function AuthCard() {
+      const [mode, setMode] = React.useState("login");
+
+      const submit = () => {
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        const confirm = document.getElementById("confirm")?.value || "";
+
+        if (!email || !password) {
+          alert("Please fill all fields");
+          return;
+        }
+
+        if (mode === "register" && password !== confirm) {
+          alert("Passwords do not match");
+          return;
+        }
+
+        const params = new URLSearchParams({
+          email,
+          password,
+          mode
+        });
+
+        // Redirect to Streamlit app
+        window.location.href =
+          "https://YOUR_STREAMLIT_APP_URL/?" + params.toString();
+      };
+
+      return (
+        <div className="card">
+          <h2>{mode === "login" ? "Login" : "Create Account"}</h2>
+          <p>AI Invoice & Expense Analyzer</p>
+
+          <input id="email" placeholder="Email" />
+          <input id="password" type="password" placeholder="Password" />
+
+          {mode === "register" && (
+            <input
+              id="confirm"
+              type="password"
+              placeholder="Confirm Password"
+            />
+          )}
+
+          <button onClick={submit}>
+            {mode === "login" ? "Login" : "Register"}
+          </button>
+
+          <div
+            className="toggle"
+            onClick={() =>
+              setMode(mode === "login" ? "register" : "login")
+            }
+          >
+            {mode === "login"
+              ? "New user? Create an account"
+              : "Already have an account? Login"}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<AuthCard />);
+  </script>
+</body>
+</html>
