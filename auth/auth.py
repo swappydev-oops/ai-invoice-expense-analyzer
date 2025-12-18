@@ -7,159 +7,158 @@ import time
 def get_conn():
     return sqlite3.connect("data.db", check_same_thread=False)
 
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+def hash_password(p):
+    return hashlib.sha256(p.encode()).hexdigest()
 
-# ---------------- CSS ----------------
-def load_css():
-    st.markdown("""
-    <style>
-    /* Remove Streamlit padding */
-    section.main > div {
-        padding-top: 2rem;
-    }
+# ---------------- HTML UI ----------------
+def render_auth_ui(mode="login"):
+    st.components.v1.html(
+        f"""
+        <html>
+        <head>
+        <style>
+        body {{
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(120deg,#0f2027,#203a43,#2c5364);
+            background-size: 400% 400%;
+            animation: bg 12s ease infinite;
+            color: white;
+        }}
 
-    /* Animated card */
-    .auth-card {
-        max-width: 420px;
-        margin: auto;
-        margin-top: 10vh;
-        padding: 2.5rem;
-        border-radius: 16px;
-        background: linear-gradient(135deg, #ffffff, #f3f6fa);
-        box-shadow: 0 25px 50px rgba(0,0,0,0.2);
-        position: relative;
-        overflow: hidden;
-        animation: fadeIn 0.8s ease-in-out;
-    }
+        @keyframes bg {{
+            0% {{background-position:0% 50%;}}
+            50% {{background-position:100% 50%;}}
+            100% {{background-position:0% 50%;}}
+        }}
 
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+        .card {{
+            width: 380px;
+            margin: 12vh auto;
+            background: white;
+            color: black;
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+        }}
 
-    /* Animated invoice lines */
-    .invoice-line {
-        position: absolute;
-        width: 80%;
-        height: 8px;
-        background: linear-gradient(
-            90deg,
-            rgba(200,200,200,0.2),
-            rgba(180,180,180,0.6),
-            rgba(200,200,200,0.2)
-        );
-        border-radius: 6px;
-        animation: scan 3s infinite linear;
-    }
+        h2 {{
+            text-align: center;
+            margin-bottom: 10px;
+        }}
 
-    @keyframes scan {
-        from { left: -80%; }
-        to { left: 120%; }
-    }
+        p {{
+            text-align: center;
+            color: #666;
+        }}
 
-    .invoice-line:nth-child(1) { top: 20px; animation-delay: 0s; }
-    .invoice-line:nth-child(2) { top: 45px; animation-delay: 1s; }
-    .invoice-line:nth-child(3) { top: 70px; animation-delay: 2s; }
+        input {{
+            width: 100%;
+            padding: 12px;
+            margin-top: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }}
 
-    .title {
-        text-align: center;
-        font-size: 1.8rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-    }
+        button {{
+            width: 100%;
+            margin-top: 20px;
+            padding: 12px;
+            background: #2c5364;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }}
 
-    .subtitle {
-        text-align: center;
-        color: #6c757d;
-        margin-bottom: 2rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+        .invoice {{
+            position: absolute;
+            width: 160px;
+            height: 220px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            animation: float 18s linear infinite;
+        }}
 
-# ---------------- LOGIN ----------------
-def login_ui():
-    load_css()
+        @keyframes float {{
+            from {{ transform: translateY(110vh); }}
+            to {{ transform: translateY(-130vh); }}
+        }}
+        </style>
+        </head>
 
-    st.markdown("""
-    <div class="auth-card">
-        <div class="invoice-line"></div>
-        <div class="invoice-line"></div>
-        <div class="invoice-line"></div>
+        <body>
+            <div class="invoice" style="left:10%;"></div>
+            <div class="invoice" style="left:40%; animation-duration:22s;"></div>
+            <div class="invoice" style="left:70%; animation-duration:26s;"></div>
 
-        <div class="title">🔐 Login</div>
-        <div class="subtitle">Access your invoice dashboard</div>
-    """, unsafe_allow_html=True)
+            <div class="card">
+                <h2>{'Login' if mode=='login' else 'Register'}</h2>
+                <p>AI Invoice & Expense Analyzer</p>
 
-    email = st.text_input("Email", key="login_email")
-    password = st.text_input("Password", type="password", key="login_pass")
+                <form method="GET">
+                    <input name="email" placeholder="Email" />
+                    <input name="password" type="password" placeholder="Password" />
+                    {"<input name='confirm' type='password' placeholder='Confirm Password' />" if mode=="register" else ""}
+                    <button type="submit">{'Login' if mode=='login' else 'Register'}</button>
+                </form>
+            </div>
+        </body>
+        </html>
+        """,
+        height=700,
+    )
 
-    if st.button("Login", use_container_width=True):
-        conn = get_conn()
-        cur = conn.cursor()
+# ---------------- AUTH LOGIC ----------------
+def require_login():
+    params = st.query_params
+    email = params.get("email")
+    password = params.get("password")
+    confirm = params.get("confirm")
+
+    mode = st.radio("", ["Login", "Register"], horizontal=True)
+
+    if not email:
+        render_auth_ui("login" if mode == "Login" else "register")
+        st.stop()
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    if mode == "Login":
         cur.execute(
             "SELECT id,email,role,plan FROM users WHERE email=? AND password=?",
             (email, hash_password(password))
         )
         user = cur.fetchone()
-        conn.close()
 
         if user:
             st.session_state.user_id = user[0]
             st.session_state.user_email = user[1]
             st.session_state.role = user[2]
             st.session_state.plan = user[3]
+            st.query_params.clear()
             st.success("Login successful 🎉")
-            time.sleep(0.4)
+            time.sleep(0.5)
             st.rerun()
         else:
             st.error("Invalid credentials")
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ---------------- REGISTER ----------------
-def register_ui():
-    load_css()
-
-    st.markdown("""
-    <div class="auth-card">
-        <div class="invoice-line"></div>
-        <div class="invoice-line"></div>
-        <div class="invoice-line"></div>
-
-        <div class="title">📝 Register</div>
-        <div class="subtitle">Create your free account</div>
-    """, unsafe_allow_html=True)
-
-    email = st.text_input("Email", key="reg_email")
-    password = st.text_input("Password", type="password", key="reg_pass")
-    confirm = st.text_input("Confirm Password", type="password")
-
-    if st.button("Register", use_container_width=True):
+    else:
         if password != confirm:
             st.error("Passwords do not match")
         else:
             try:
-                conn = get_conn()
-                cur = conn.cursor()
                 cur.execute(
                     "INSERT INTO users(email,password,role,plan) VALUES(?,?,?,?)",
                     (email, hash_password(password), "user", "free")
                 )
                 conn.commit()
-                conn.close()
                 st.success("Account created 🎉")
             except sqlite3.IntegrityError:
                 st.error("Email already exists")
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ---------------- AUTH GATE ----------------
-def require_login():
-    if "user_id" not in st.session_state:
-        mode = st.radio("", ["Login", "Register"], horizontal=True)
-        if mode == "Login":
-            login_ui()
-        else:
-            register_ui()
-        st.stop()
+    conn.close()
+    st.stop()
