@@ -4,10 +4,10 @@ from PIL import Image
 import os
 from io import BytesIO
 from openpyxl.utils import get_column_letter
-import time
 from db.db import init_db, get_connection
 from auth.auth import require_login
 from utils import extract_invoice_details
+import time
 
 # -------------------------------------------------
 # Initialize Database & Auth
@@ -30,10 +30,11 @@ with st.sidebar:
     st.write(f"👤 {st.session_state.user_email}")
 
     if st.button("Logout"):
-    st.session_state.clear()
-    st.toast("Logout successful 👋", icon="✅")
-    time.sleep(0.5)
-    st.rerun()
+        st.session_state.clear()
+        st.toast("Logout successful 👋", icon="✅")
+        time.sleep(0.5)
+        st.rerun()
+
 
 # -------------------------------------------------
 # Main Title
