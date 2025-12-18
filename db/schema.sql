@@ -55,3 +55,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     new_value TEXT,
     edited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';
+ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free';
+
