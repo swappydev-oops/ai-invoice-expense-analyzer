@@ -17,7 +17,7 @@ from db.invoice_repo import (
 )
 
 # -------------------------------------------------
-# Safe Toast Helper (compatible with all Streamlit versions)
+# Safe Toast Helper (works on all Streamlit versions)
 # -------------------------------------------------
 def show_toast(message):
     try:
@@ -66,7 +66,7 @@ uploaded_files = st.file_uploader(
 )
 
 # -------------------------------------------------
-# Upload & OCR Processing → DB
+# Upload & OCR Processing → Database
 # -------------------------------------------------
 if uploaded_files:
     for file in uploaded_files:
@@ -134,7 +134,7 @@ else:
     st.info("No invoices uploaded yet.")
 
 # -------------------------------------------------
-# Monthly GST Dashboard
+# Monthly GST Dashboard (DEFENSIVE & STABLE)
 # -------------------------------------------------
 st.subheader("📅 Monthly GST Summary")
 
@@ -147,14 +147,20 @@ if not df_gst.empty:
         df_gst["month"].tolist()
     )
 
-    month_data = df_gst[df_gst["month"] == selected_month].iloc[0]
+    filtered = df_gst[df_gst["month"] == selected_month]
 
-    col1, col2, col3 = st.columns(3)
+    if not filtered.empty:
+        month_data = filtered.iloc[0]
 
-    col1.metric("Taxable Amount", f"₹ {month_data['taxable_amount']:,}")
-    col2.metric("GST Amount", f"₹ {month_data['gst_amount']:,}")
-    col3.metric("Total Spend", f"₹ {month_data['total_amount']:,}")
+        col1, col2, col3 = st.columns(3)
 
+        col1.metric("Taxable Amount", f"₹ {month_data['taxable_amount']:,}")
+        col2.metric("GST Amount", f"₹ {month_data['gst_amount']:,}")
+        col3.metric("Total Spend", f"₹ {month_data['total_amount']:,}")
+    else:
+        st.warning("No data available for the selected month.")
+
+    # GST Chart (Always Safe)
     st.bar_chart(
         df_gst.set_index("month")[["gst_amount"]],
         use_container_width=True
