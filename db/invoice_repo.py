@@ -1,5 +1,7 @@
 import pandas as pd
 from db.db import get_connection
+from db.invoice_repo import get_monthly_gst_summary
+
 
 # ---------------- CREATE ----------------
 
@@ -99,3 +101,24 @@ def delete_invoice(invoice_id):
     cursor.execute("DELETE FROM invoices WHERE id = ?", (invoice_id,))
     conn.commit()
     conn.close()
+
+def get_monthly_gst_summary(user_id):
+    conn = get_connection()
+    df = pd.read_sql(
+        """
+        SELECT
+            strftime('%Y-%m', invoice_date) AS month,
+            ROUND(SUM(subtotal), 2) AS taxable_amount,
+            ROUND(SUM(gst_amount), 2) AS gst_amount,
+            ROUND(SUM(total_amount), 2) AS total_amount
+        FROM invoices
+        WHERE user_id = ?
+        GROUP BY month
+        ORDER BY month DESC
+        """,
+        conn,
+        params=(user_id,)
+    )
+    conn.close()
+    return df
+

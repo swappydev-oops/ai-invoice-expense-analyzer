@@ -140,28 +140,69 @@ if not df_db.empty:
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_db.drop(columns=["id"]).to_excel(
-            writer, index=False, sheet_name="Invoices"
-        )
-        ws = writer.sheets["Invoices"]
 
-        # Auto column width
-        for idx, col in enumerate(df_db.drop(columns=["id"]).columns, 1):
-            col_letter = get_column_letter(idx)
-            max_len = max(
-                df_db[col].astype(str).map(len).max(),
-                len(col)
-            )
-            ws.column_dimensions[col_letter].width = max_len + 3
+    # Sheet 1: Invoices
+    df_db.drop(columns=["id"]).to_excel(
+        writer, index=False, sheet_name="Invoices"
+    )
+
+    # Sheet 2: Monthly GST Summary
+    df_gst.to_excel(
+        writer, index=False, sheet_name="Monthly_GST_Summary"
+    )
 
     output.seek(0)
 
     st.download_button(
-        label="Download Excel",
+        "⬇ Download GST Report (Excel)",
         data=output,
-        file_name="invoice_history.xlsx",
+        file_name="gst_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+
 else:
     st.info("No invoices uploaded yet.")
+
+# -------------------------------------------------
+# Monthly GST Dashboard
+# -------------------------------------------------
+    st.subheader("📅 Monthly GST Summary")
+
+    df_gst = get_monthly_gst_summary(st.session_state.user_id)
+
+    if not df_gst.empty:
+
+    # Month selector
+        selected_month = st.selectbox(
+            "Select Month",
+            df_gst["month"].tolist()
+        )
+
+    selected_data = df_gst[df_gst["month"] == selected_month].iloc[0]
+
+    # KPI Cards
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "Taxable Amount",
+        f"₹ {selected_data['taxable_amount']:,}"
+    )
+    col2.metric(
+        "GST Amount",
+        f"₹ {selected_data['gst_amount']:,}"
+    )
+    col3.metric(
+        "Total Spend",
+        f"₹ {selected_data['total_amount']:,}"
+    )
+
+    # Chart
+    st.bar_chart(
+        df_gst.set_index("month")[["gst_amount"]],
+        use_container_width=True
+    )
+
+    else:
+        st.info("No GST data available yet.")
+
