@@ -5,6 +5,7 @@ import os
 
 from utils import extract_invoice_details
 
+# ---------------- Page Config ----------------
 st.set_page_config(
     page_title="AI Invoice & Expense Analyzer",
     layout="wide"
@@ -12,6 +13,7 @@ st.set_page_config(
 
 st.title("🧾 AI Invoice & Expense Analyzer (v2)")
 
+# ---------------- File Upload ----------------
 uploaded_files = st.file_uploader(
     "Upload Invoice Images or PDFs",
     type=["png", "jpg", "jpeg", "pdf"],
@@ -20,27 +22,28 @@ uploaded_files = st.file_uploader(
 
 HISTORY_FILE = "invoice_history.csv"
 
-# 🔹 Display-friendly column names
+# ---------------- Display Header Mapping ----------------
 DISPLAY_COLUMN_MAPPING = {
     "invoice_number": "Invoice Number",
-    "invoice_number_conf": "Invoice Number Confidence",
+    "invoice_number_conf": "Invoice Number Confidence (%)",
     "vendor": "Vendor Name",
-    "vendor_conf": "Vendor Confidence",
+    "vendor_conf": "Vendor Confidence (%)",
     "date": "Invoice Date",
-    "date_conf": "Date Confidence",
+    "date_conf": "Date Confidence (%)",
     "subtotal": "Subtotal Amount",
-    "subtotal_conf": "Subtotal Confidence",
+    "subtotal_conf": "Subtotal Confidence (%)",
     "tax": "GST Amount",
     "gst_percent": "GST %",
-    "tax_conf": "GST Confidence",
+    "tax_conf": "GST Confidence (%)",
     "total_amount": "Total Amount",
-    "total_conf": "Total Amount Confidence",
+    "total_conf": "Total Amount Confidence (%)",
     "category": "Category",
     "source_file": "Source File"
 }
 
 all_data = []
 
+# ---------------- Processing ----------------
 if uploaded_files:
     for file in uploaded_files:
         try:
@@ -60,37 +63,48 @@ if uploaded_files:
     if all_data:
         df_new = pd.DataFrame(all_data)
 
-        st.success("Invoices processed successfully")
-
-        # ---------- Append to CSV History ----------
+        # ---------------- Load History ----------------
         if os.path.exists(HISTORY_FILE):
             df_old = pd.read_csv(HISTORY_FILE)
             df_final = pd.concat([df_old, df_new], ignore_index=True)
         else:
             df_final = df_new
 
-        # ✅ Remove duplicate invoices
+        # ---------------- Data Cleanup ----------------
+
+        # Normalize date to YYYY-MM-DD
+        df_final["date"] = pd.to_datetime(
+            df_final["date"], errors="coerce", dayfirst=True
+        ).dt.strftime("%Y-%m-%d")
+
+        # Convert numeric columns
+        NUMERIC_COLUMNS = ["subtotal", "tax", "gst_percent", "total_amount"]
+        for col in NUMERIC_COLUMNS:
+            df_final[col] = pd.to_numeric(df_final[col], errors="coerce")
+
+        # Convert confidence to percentage
+        CONF_COLS = [c for c in df_final.columns if c.endswith("_conf")]
+        for col in CONF_COLS:
+            df_final[col] = (df_final[col] * 100).round(0)
+
+        # Remove duplicate invoices
         df_final = df_final.drop_duplicates(
             subset=["invoice_number", "vendor", "date", "source_file"],
             keep="first"
         )
 
+        # ---------------- Display & Export ----------------
+        df_display = df_final.rename(columns=DISPLAY_COLUMN_MAPPING)
 
-
-        # ---------- Rename columns for UI & Export ----------
-        df_display = df_new.rename(columns=DISPLAY_COLUMN_MAPPING)
-        df_final_display = df_final.rename(columns=DISPLAY_COLUMN_MAPPING)
-
-        # ---------- Save history ----------
-        df_final_display.to_csv(HISTORY_FILE, index=False)
-
-        # ---------- Show table ----------
+        st.success("Invoices processed successfully")
         st.dataframe(df_display, use_container_width=True)
 
-        # ---------- Download ----------
+        # Save CSV history
+        df_display.to_csv(HISTORY_FILE, index=False)
+
         st.download_button(
-            label="⬇ Download Full Invoice History (CSV)",
-            data=df_final_display.to_csv(index=False).encode("utf-8"),
+            label="⬇ Download Invoice History (CSV)",
+            data=df_display.to_csv(index=False).encode("utf-8"),
             file_name="invoice_history.csv",
             mime="text/csv"
         )
