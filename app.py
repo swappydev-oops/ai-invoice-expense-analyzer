@@ -16,22 +16,22 @@ from db.invoice_repo import (
     get_monthly_gst_summary
 )
 #------ Test Duplicate Rows----------
-from db.db import get_connection
+# from db.db import get_connection
 
-conn = get_connection()
-cursor = conn.cursor()
+# conn = get_connection()
+# cursor = conn.cursor()
 
-cursor.execute("""
-DELETE FROM invoices
-WHERE id NOT IN (
-    SELECT MIN(id)
-    FROM invoices
-    GROUP BY user_id, invoice_number
-)
-""")
+# cursor.execute("""
+# DELETE FROM invoices
+# WHERE id NOT IN (
+#     SELECT MIN(id)
+#     FROM invoices
+#     GROUP BY user_id, invoice_number
+# )
+# """)
 
-conn.commit()
-conn.close()
+# conn.commit()
+# conn.close()
 
 #--------------------------------
 
