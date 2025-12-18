@@ -242,60 +242,6 @@ if not df_db.empty:
     )
 
 # -------------------------------------------------
-# Upload
-# -------------------------------------------------
-if "processed" not in st.session_state:
-    st.session_state.processed = False
-
-files = st.file_uploader(
-    "Upload invoices (Image/PDF)",
-    type=["png", "jpg", "jpeg", "pdf"],
-    accept_multiple_files=True
-)
-
-if files and not st.session_state.processed:
-    added, skipped = 0, 0
-    for f in files:
-        if f.type == "application/pdf":
-            data = extract_invoice_details(f, "pdf")
-        else:
-            data = extract_invoice_details(Image.open(f), "image")
-
-        if invoice_exists(st.session_state.user_id, data["invoice_number"]):
-            skipped += 1
-            continue
-
-        insert_invoice(st.session_state.user_id, data)
-        added += 1
-    st.session_state.processed = True
-    if added:
-        show_toast(f"{added} invoices uploaded")
-    if skipped:
-        st.warning(f"{skipped} duplicates skipped")
-
-if not files:
-    st.session_state.processed = False
-
-# -------------------------------------------------
-# INVOICE TABLE
-# -------------------------------------------------
-st.subheader("🧾 Invoices")
-
-df = get_invoices(st.session_state.user_id)
-if not df.empty:
-    edited = st.data_editor(df, use_container_width=True, num_rows="fixed")
-
-    if st.button("Save Changes"):
-        for _, r in edited.iterrows():
-            update_invoice(r["id"], r.to_dict())
-        show_toast("Updated")
-
-    del_id = st.selectbox("Delete Invoice", df["id"])
-    if st.button("Delete"):
-        delete_invoice(del_id)
-        st.rerun()
-
-# -------------------------------------------------
 # GST VALIDATION FLAGS
 # -------------------------------------------------
 st.subheader("⚠ GST Validation")
