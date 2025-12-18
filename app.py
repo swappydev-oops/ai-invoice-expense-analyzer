@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from db.db import init_db
+init_db()
 from PIL import Image
 import os
 from io import BytesIO
