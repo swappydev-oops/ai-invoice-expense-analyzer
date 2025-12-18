@@ -4,12 +4,18 @@ import time
 from db.db import get_connection
 
 # -------------------------------------------------
-# Toast Compatibility Helper (VERY IMPORTANT)
+# Toast Compatibility Helper (NO st.toast usage)
 # -------------------------------------------------
-def show_toast(message, icon="✅"):
-    if hasattr(st, "toast"):
-        st.toast(message, icon=icon)
-    else:
+def show_toast(message):
+    """
+    Safe notification helper.
+    Works on ALL Streamlit versions.
+    """
+    try:
+        # Newer Streamlit
+        st.toast(message, icon="✅")
+    except Exception:
+        # Older Streamlit fallback
         st.success(message)
 
 # -------------------------------------------------
@@ -67,7 +73,7 @@ def login_ui():
             st.error("Incorrect password")
             return
 
-        # Set session state
+        # Set session
         st.session_state.user_id = user_id
         st.session_state.user_email = email
 
