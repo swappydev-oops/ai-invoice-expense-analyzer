@@ -19,6 +19,26 @@ uploaded_files = st.file_uploader(
 )
 
 HISTORY_FILE = "invoice_history.csv"
+
+# 🔹 Display-friendly column names
+DISPLAY_COLUMN_MAPPING = {
+    "invoice_number": "Invoice Number",
+    "invoice_number_conf": "Invoice Number Confidence",
+    "vendor": "Vendor Name",
+    "vendor_conf": "Vendor Confidence",
+    "date": "Invoice Date",
+    "date_conf": "Date Confidence",
+    "subtotal": "Subtotal Amount",
+    "subtotal_conf": "Subtotal Confidence",
+    "tax": "GST Amount",
+    "gst_percent": "GST %",
+    "tax_conf": "GST Confidence",
+    "total_amount": "Total Amount",
+    "total_conf": "Total Amount Confidence",
+    "category": "Category",
+    "source_file": "Source File"
+}
+
 all_data = []
 
 if uploaded_files:
@@ -41,7 +61,6 @@ if uploaded_files:
         df_new = pd.DataFrame(all_data)
 
         st.success("Invoices processed successfully")
-        st.dataframe(df_new)
 
         # ---------- Append to CSV History ----------
         if os.path.exists(HISTORY_FILE):
@@ -50,12 +69,20 @@ if uploaded_files:
         else:
             df_final = df_new
 
-        df_final.to_csv(HISTORY_FILE, index=False)
+        # ---------- Rename columns for UI & Export ----------
+        df_display = df_new.rename(columns=DISPLAY_COLUMN_MAPPING)
+        df_final_display = df_final.rename(columns=DISPLAY_COLUMN_MAPPING)
 
+        # ---------- Save history ----------
+        df_final_display.to_csv(HISTORY_FILE, index=False)
+
+        # ---------- Show table ----------
+        st.dataframe(df_display, use_container_width=True)
+
+        # ---------- Download ----------
         st.download_button(
-    label="⬇ Download Full Invoice History (CSV)",
-    data=df_final.to_csv(index=False).encode("utf-8"),
-    file_name="invoice_history.csv",
-    mime="text/csv"
-)
-
+            label="⬇ Download Full Invoice History (CSV)",
+            data=df_final_display.to_csv(index=False).encode("utf-8"),
+            file_name="invoice_history.csv",
+            mime="text/csv"
+        )
