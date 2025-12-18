@@ -7,16 +7,17 @@ from openpyxl.utils import get_column_letter
 
 from db.db import init_db
 from auth.auth import require_login
+from utils import extract_invoice_details
 from db.invoice_repo import (
     insert_invoice,
     get_invoices,
     update_invoice,
-    delete_invoice
+    delete_invoice,
+    get_monthly_gst_summary
 )
-from utils import extract_invoice_details
 
 # -------------------------------------------------
-# Safe Toast Helper (works on all Streamlit versions)
+# Safe Toast Helper (compatible with all Streamlit versions)
 # -------------------------------------------------
 def show_toast(message):
     try:
@@ -65,7 +66,7 @@ uploaded_files = st.file_uploader(
 )
 
 # -------------------------------------------------
-# Upload & OCR Processing
+# Upload & OCR Processing → DB
 # -------------------------------------------------
 if uploaded_files:
     for file in uploaded_files:
@@ -91,18 +92,17 @@ if uploaded_files:
     st.rerun()
 
 # -------------------------------------------------
-# Load Invoices from DB (Current User Only)
+# Load Invoices (Current User Only)
 # -------------------------------------------------
 df_db = get_invoices(st.session_state.user_id)
 
 # -------------------------------------------------
-# Invoice Management Section
+# Invoice Management (Edit / Delete)
 # -------------------------------------------------
 st.subheader("📊 Uploaded Invoices")
 
 if not df_db.empty:
 
-    # ---------------- Editable Table ----------------
     edited_df = st.data_editor(
         df_db,
         use_container_width=True,
@@ -112,16 +112,13 @@ if not df_db.empty:
 
     col1, col2 = st.columns(2)
 
-    # ---------------- Save Changes ----------------
     with col1:
         if st.button("💾 Save Changes"):
             for _, row in edited_df.iterrows():
                 update_invoice(row["id"], row.to_dict())
-
             show_toast("Invoices updated successfully")
             st.rerun()
 
-    # ---------------- Delete Invoice ----------------
     with col2:
         invoice_to_delete = st.selectbox(
             "🗑 Select Invoice ID to delete",
@@ -133,23 +130,66 @@ if not df_db.empty:
             show_toast("Invoice deleted")
             st.rerun()
 
-    # -------------------------------------------------
-    # Excel Export (DB → Excel)
-    # -------------------------------------------------
-    st.subheader("⬇ Download Invoice History")
+else:
+    st.info("No invoices uploaded yet.")
+
+# -------------------------------------------------
+# Monthly GST Dashboard
+# -------------------------------------------------
+st.subheader("📅 Monthly GST Summary")
+
+df_gst = get_monthly_gst_summary(st.session_state.user_id)
+
+if not df_gst.empty:
+
+    selected_month = st.selectbox(
+        "Select Month",
+        df_gst["month"].tolist()
+    )
+
+    month_data = df_gst[df_gst["month"] == selected_month].iloc[0]
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Taxable Amount", f"₹ {month_data['taxable_amount']:,}")
+    col2.metric("GST Amount", f"₹ {month_data['gst_amount']:,}")
+    col3.metric("Total Spend", f"₹ {month_data['total_amount']:,}")
+
+    st.bar_chart(
+        df_gst.set_index("month")[["gst_amount"]],
+        use_container_width=True
+    )
+
+else:
+    st.info("No GST data available yet.")
+
+# -------------------------------------------------
+# Multi-Sheet GST Excel Export
+# -------------------------------------------------
+if not df_db.empty:
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
 
-    # Sheet 1: Invoices
-    df_db.drop(columns=["id"]).to_excel(
-        writer, index=False, sheet_name="Invoices"
-    )
+        # Sheet 1: Invoices
+        df_db.drop(columns=["id"]).to_excel(
+            writer, index=False, sheet_name="Invoices"
+        )
 
-    # Sheet 2: Monthly GST Summary
-    df_gst.to_excel(
-        writer, index=False, sheet_name="Monthly_GST_Summary"
-    )
+        # Sheet 2: Monthly GST Summary
+        df_gst.to_excel(
+            writer, index=False, sheet_name="Monthly_GST_Summary"
+        )
+
+        ws = writer.sheets["Invoices"]
+
+        for idx, col in enumerate(df_db.drop(columns=["id"]).columns, 1):
+            col_letter = get_column_letter(idx)
+            max_len = max(
+                df_db[col].astype(str).map(len).max(),
+                len(col)
+            )
+            ws.column_dimensions[col_letter].width = max_len + 3
 
     output.seek(0)
 
@@ -159,50 +199,3 @@ if not df_db.empty:
         file_name="gst_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
-
-else:
-    st.info("No invoices uploaded yet.")
-
-# -------------------------------------------------
-# Monthly GST Dashboard
-# -------------------------------------------------
-    st.subheader("📅 Monthly GST Summary")
-
-    df_gst = get_monthly_gst_summary(st.session_state.user_id)
-
-    if not df_gst.empty:
-
-    # Month selector
-        selected_month = st.selectbox(
-            "Select Month",
-            df_gst["month"].tolist()
-        )
-
-    selected_data = df_gst[df_gst["month"] == selected_month].iloc[0]
-
-    # KPI Cards
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Taxable Amount",
-        f"₹ {selected_data['taxable_amount']:,}"
-    )
-    col2.metric(
-        "GST Amount",
-        f"₹ {selected_data['gst_amount']:,}"
-    )
-    col3.metric(
-        "Total Spend",
-        f"₹ {selected_data['total_amount']:,}"
-    )
-
-    # Chart
-    st.bar_chart(
-        df_gst.set_index("month")[["gst_amount"]],
-        use_container_width=True
-    )
-
-    else:
-        st.info("No GST data available yet.")
-
