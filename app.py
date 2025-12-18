@@ -13,27 +13,9 @@ from db.invoice_repo import (
     get_invoices,
     update_invoice,
     delete_invoice,
-    get_monthly_gst_summary
+    get_monthly_gst_summary,
+    invoice_exists
 )
-#------ Test Duplicate Rows----------
-# from db.db import get_connection
-
-# conn = get_connection()
-# cursor = conn.cursor()
-
-# cursor.execute("""
-# DELETE FROM invoices
-# WHERE id NOT IN (
-#     SELECT MIN(id)
-#     FROM invoices
-#     GROUP BY user_id, invoice_number
-# )
-# """)
-
-# conn.commit()
-# conn.close()
-
-#--------------------------------
 
 # -------------------------------------------------
 # Safe Toast Helper (Streamlit version compatible)
@@ -76,7 +58,7 @@ with st.sidebar:
 st.title("🧾 AI Invoice & Expense Analyzer")
 
 # -------------------------------------------------
-# Session Guard (IMPORTANT: prevents duplicate inserts)
+# Session Guard (prevents duplicate inserts on rerun)
 # -------------------------------------------------
 if "files_processed" not in st.session_state:
     st.session_state.files_processed = False
@@ -91,13 +73,17 @@ uploaded_files = st.file_uploader(
 )
 
 # -------------------------------------------------
-# Upload & OCR Processing → DB (ONCE PER UPLOAD)
+# Upload & OCR Processing → DB (with DUPLICATE VALIDATION)
 # -------------------------------------------------
 if uploaded_files and not st.session_state.files_processed:
+
+    inserted_count = 0
+    skipped_count = 0
 
     for file in uploaded_files:
         try:
             with st.spinner(f"Processing {file.name}..."):
+
                 if file.type == "application/pdf":
                     data = extract_invoice_details(file, "pdf")
                 else:
@@ -105,18 +91,35 @@ if uploaded_files and not st.session_state.files_processed:
                     data = extract_invoice_details(image, "image")
 
                 data["source_file"] = file.name
+                invoice_no = data.get("invoice_number")
 
-                # DB layer prevents duplicates per (user_id, invoice_number)
+                # ---- DUPLICATE CHECK (PER USER) ----
+                if invoice_no and invoice_exists(
+                    st.session_state.user_id,
+                    invoice_no
+                ):
+                    skipped_count += 1
+                    continue
+
                 insert_invoice(
                     user_id=st.session_state.user_id,
                     data=data
                 )
+                inserted_count += 1
 
         except Exception as e:
             st.error(f"{file.name}: {str(e)}")
 
     st.session_state.files_processed = True
-    show_toast("Invoice(s) uploaded successfully 🎉")
+
+    # ---- USER FEEDBACK ----
+    if inserted_count > 0:
+        show_toast(f"{inserted_count} invoice(s) uploaded successfully 🎉")
+
+    if skipped_count > 0:
+        st.warning(
+            f"{skipped_count} invoice(s) were already uploaded and were skipped."
+        )
 
 # -------------------------------------------------
 # Reset upload flag when uploader is cleared
@@ -125,7 +128,7 @@ if not uploaded_files:
     st.session_state.files_processed = False
 
 # -------------------------------------------------
-# Load Invoices (USER-SCOPED ONLY)
+# Load Invoices (USER-SCOPED)
 # -------------------------------------------------
 df_db = get_invoices(st.session_state.user_id)
 
@@ -145,7 +148,7 @@ if not df_db.empty:
 
     col1, col2 = st.columns(2)
 
-    # ---------------- Save Edits ----------------
+    # ---------------- Save Changes ----------------
     with col1:
         if st.button("💾 Save Changes"):
             for _, row in edited_df.iterrows():
@@ -168,7 +171,7 @@ else:
     st.info("No invoices uploaded yet.")
 
 # -------------------------------------------------
-# Monthly GST Dashboard (SAFE)
+# Monthly GST Dashboard (SAFE & DEFENSIVE)
 # -------------------------------------------------
 st.subheader("📅 Monthly GST Summary")
 

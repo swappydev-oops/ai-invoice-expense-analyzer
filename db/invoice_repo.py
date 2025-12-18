@@ -2,7 +2,26 @@ import pandas as pd
 from db.db import get_connection
 
 # -------------------------------------------------
-# INSERT (NO DUPLICATES PER USER)
+# CHECK DUPLICATE (PER USER)
+# -------------------------------------------------
+def invoice_exists(user_id, invoice_number):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT 1
+        FROM invoices
+        WHERE user_id = ? AND invoice_number = ?
+        LIMIT 1
+        """,
+        (user_id, invoice_number)
+    )
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
+# -------------------------------------------------
+# INSERT (SAFE)
 # -------------------------------------------------
 def insert_invoice(user_id, data: dict):
     conn = get_connection()
@@ -10,7 +29,7 @@ def insert_invoice(user_id, data: dict):
 
     cursor.execute(
         """
-        INSERT OR IGNORE INTO invoices (
+        INSERT INTO invoices (
             user_id,
             invoice_number,
             invoice_date,
@@ -40,7 +59,7 @@ def insert_invoice(user_id, data: dict):
     conn.close()
 
 # -------------------------------------------------
-# READ (USER-SCOPED)
+# READ
 # -------------------------------------------------
 def get_invoices(user_id):
     conn = get_connection()
