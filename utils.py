@@ -1,30 +1,43 @@
 import requests
 import re
 from categories import EXPENSE_CATEGORIES
+import io
+import base64
 
 API_KEY = "K85063436188957"
 
 def extract_invoice_details_from_image(image):
-    import io
-
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
-    img_bytes = buffered.getvalue()
+
+    img_base64 = base64.b64encode(buffered.getvalue()).decode()
+
+    payload = {
+        "apikey": API_KEY,
+        "base64Image": f"data:image/png;base64,{img_base64}",
+        "language": "eng",
+        "isOverlayRequired": False,
+        "OCREngine": 2
+    }
 
     response = requests.post(
         "https://api.ocr.space/parse/image",
-        files={"image": img_bytes},
-        data={"apikey": API_KEY, "language": "eng"}
+        data=payload,
+        timeout=30
     )
 
     result = response.json()
 
+    if result.get("IsErroredOnProcessing"):
+        raise Exception(result.get("ErrorMessage"))
+
     parsed_results = result.get("ParsedResults")
     if not parsed_results:
-        raise Exception("OCR failed or no text returned")
+        raise Exception("OCR returned no text")
 
     text = parsed_results[0].get("ParsedText", "")
 
+    # ---- Extraction logic ----
     invoice_number = re.search(r"Invoice\s*No[:\s]*([A-Za-z0-9-]+)", text)
     date = re.search(r"Date[:\s]*([0-9/-]+)", text)
     total_amount = re.search(r"Total.*?([0-9,.]+)", text)
