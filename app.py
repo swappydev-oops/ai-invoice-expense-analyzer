@@ -22,247 +22,221 @@ from db.invoice_repo import (
 )
 
 # -------------------------------------------------
-# Toast helper (safe)
+# PAGE CONFIG
 # -------------------------------------------------
-def show_toast(msg):
-    try:
-        st.toast(msg, icon="✅")
-    except Exception:
-        st.success(msg)
-
-# -------------------------------------------------
-# Init DB + Auth
-# -------------------------------------------------
-init_db()
-require_login()
-
 st.set_page_config(
     page_title="AI Invoice & Expense Analyzer",
     layout="wide"
 )
 
 # -------------------------------------------------
-# Sidebar
+# THEME (DARK / LIGHT)
+# -------------------------------------------------
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
+def apply_theme(dark):
+    if dark:
+        st.markdown("""
+        <style>
+        body { background-color: #0e1117; color: #fafafa; }
+        .kpi-card { background:#161b22; }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <style>
+        body { background-color: #ffffff; color: #262730; }
+        .kpi-card { background:#f6f8fa; }
+        </style>
+        """, unsafe_allow_html=True)
+
+apply_theme(st.session_state.dark_mode)
+
+# -------------------------------------------------
+# GLOBAL UI CSS
+# -------------------------------------------------
+st.markdown("""
+<style>
+.kpi-card {
+    padding: 1.5rem;
+    border-radius: 14px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    text-align: center;
+}
+.kpi-title {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-top: 0.3rem;
+}
+button[kind="primary"] {
+    background: linear-gradient(135deg,#2563eb,#4f46e5);
+    color: white;
+    border-radius: 10px;
+    font-weight: 600;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------------------------------
+# INIT
+# -------------------------------------------------
+init_db()
+require_login()
+
+# -------------------------------------------------
+# SIDEBAR
 # -------------------------------------------------
 with st.sidebar:
-    st.write(f"👤 {st.session_state.user_email}")
-    st.write(f"📦 Plan: {st.session_state.plan}")
-    st.write(f"🔐 Role: {st.session_state.role}")
+    st.markdown("### 🧾 Invoice Analyzer")
+    st.markdown(f"👤 **{st.session_state.user_email}**")
+    st.markdown(f"📦 Plan: `{st.session_state.plan}`")
+    st.markdown(f"🔐 Role: `{st.session_state.role}`")
 
-    if st.button("Logout"):
+    st.divider()
+
+    st.session_state.dark_mode = st.toggle(
+        "🌙 Dark mode",
+        value=st.session_state.dark_mode
+    )
+
+    st.divider()
+
+    if st.button("🚪 Logout"):
         st.session_state.clear()
-        show_toast("Logout successful")
-        time.sleep(0.3)
         st.rerun()
 
 # -------------------------------------------------
-# Title
+# TITLE
 # -------------------------------------------------
-st.title("📊 AI Invoice & Expense Dashboard")
-
-# -------------------------------------------------
-# Upload Guard
-# -------------------------------------------------
-if "files_processed" not in st.session_state:
-    st.session_state.files_processed = False
+st.title("📊 Dashboard")
 
 # -------------------------------------------------
-# Upload Invoices
+# LOAD DATA
 # -------------------------------------------------
-uploaded_files = st.file_uploader(
-    "Upload Invoice Images / PDFs (WhatsApp downloads supported)",
-    type=["png", "jpg", "jpeg", "pdf"],
-    accept_multiple_files=True
-)
-
-if uploaded_files and not st.session_state.files_processed:
-
-    added, skipped = 0, 0
-
-    for file in uploaded_files:
-        try:
-            if file.type == "application/pdf":
-                data = extract_invoice_details(file, "pdf")
-            else:
-                data = extract_invoice_details(Image.open(file), "image")
-
-            invoice_no = data.get("invoice_number")
-
-            if invoice_no and invoice_exists(
-                st.session_state.user_id,
-                invoice_no
-            ):
-                skipped += 1
-                continue
-
-            # Free plan enforcement
-            if (
-                st.session_state.plan == "free"
-                and get_invoices(st.session_state.user_id).shape[0] >= 50
-            ):
-                st.error("Free plan limit reached (50 invoices).")
-                break
-
-            insert_invoice(st.session_state.user_id, data)
-            added += 1
-
-        except Exception as e:
-            st.error(f"{file.name}: {str(e)}")
-
-    st.session_state.files_processed = True
-
-    if added:
-        show_toast(f"{added} invoice(s) uploaded")
-    if skipped:
-        st.warning(f"{skipped} duplicate invoice(s) skipped")
-
-if not uploaded_files:
-    st.session_state.files_processed = False
+df = get_invoices(st.session_state.user_id)
 
 # -------------------------------------------------
-# Load invoices (canonical)
+# EMPTY STATE
 # -------------------------------------------------
-df_invoices = get_invoices(st.session_state.user_id)
+if df.empty:
+    st.markdown("""
+    <div style="text-align:center; padding:4rem;">
+        <h2>📭 No invoices yet</h2>
+        <p style="color:#6b7280;">
+            Upload your first invoice to unlock insights
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
 
 # -------------------------------------------------
-# Invoice Table (Editable based on role)
+# KPI CARDS
+# -------------------------------------------------
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Total Invoices</div>
+        <div class="kpi-value">📄 {len(df)}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Total Spend</div>
+        <div class="kpi-value">₹ {df["total_amount"].sum():,.0f}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-title">GST Paid</div>
+        <div class="kpi-value">₹ {df["tax"].sum():,.0f}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.divider()
+
+# -------------------------------------------------
+# INVOICE TABLE
 # -------------------------------------------------
 st.subheader("🧾 Invoices")
 
-if not df_invoices.empty:
+editable = can_edit(st.session_state.role)
 
-    editable = can_edit(st.session_state.role)
+edited_df = st.data_editor(
+    df,
+    disabled=not editable,
+    use_container_width=True,
+    num_rows="fixed"
+)
 
-    edited_df = st.data_editor(
-        df_invoices,
-        use_container_width=True,
-        num_rows="fixed",
-        disabled=not editable
-    )
+if editable:
+    col1, col2 = st.columns(2)
 
-    if editable:
-        col1, col2 = st.columns(2)
+    with col1:
+        if st.button("💾 Save Changes", type="primary", use_container_width=True):
+            for _, r in edited_df.iterrows():
+                update_invoice(r["id"], r.to_dict())
+            st.toast("Invoices updated")
 
-        with col1:
-            if st.button("💾 Save Changes"):
-                for _, row in edited_df.iterrows():
-                    update_invoice(row["id"], row.to_dict())
-                show_toast("Invoices updated")
-
-        with col2:
-            del_id = st.selectbox(
-                "🗑 Delete Invoice",
-                df_invoices["id"]
-            )
-            if st.button("Delete"):
-                delete_invoice(del_id)
-                show_toast("Invoice deleted")
-                st.rerun()
-else:
-    st.info("No invoices uploaded yet.")
+    with col2:
+        del_id = st.selectbox("Delete invoice", df["id"])
+        if st.button("Delete"):
+            delete_invoice(del_id)
+            st.rerun()
 
 # -------------------------------------------------
-# GST Validation Flags (Safe numeric handling)
-# -------------------------------------------------
-st.subheader("⚠ GST Validation Flags")
-
-if not df_invoices.empty:
-    gst_df = df_invoices.copy()
-
-    for col in ["subtotal", "gst_percent", "tax"]:
-        gst_df[col] = (
-            gst_df[col]
-            .astype(str)
-            .str.replace(",", "")
-            .str.replace("%", "")
-        )
-        gst_df[col] = pd.to_numeric(
-            gst_df[col], errors="coerce"
-        ).fillna(0)
-
-    gst_df["expected_gst"] = (
-        gst_df["subtotal"] * gst_df["gst_percent"] / 100
-    ).round(2)
-
-    gst_df["gst_mismatch"] = (
-        gst_df["expected_gst"] != gst_df["tax"]
-    )
-
-    mismatches = gst_df[gst_df["gst_mismatch"]]
-
-    if not mismatches.empty:
-        st.dataframe(mismatches, use_container_width=True)
-    else:
-        st.success("No GST mismatches detected")
-
-# -------------------------------------------------
-# Monthly Trend Dashboard
+# MONTHLY TREND
 # -------------------------------------------------
 st.subheader("📈 Monthly Spend Trend")
-
-df_gst = get_monthly_gst_summary(st.session_state.user_id)
-
-if not df_gst.empty:
-    st.line_chart(
-        df_gst.set_index("month")[["total_amount"]],
-        use_container_width=True
-    )
+gst = get_monthly_gst_summary(st.session_state.user_id)
+st.line_chart(gst.set_index("month")[["total_amount"]])
 
 # -------------------------------------------------
-# Vendor-wise Spend Dashboard
+# VENDOR DASHBOARD
 # -------------------------------------------------
 st.subheader("🏢 Vendor-wise Spend")
-
-df_vendor = get_vendor_spend(st.session_state.user_id)
-if not df_vendor.empty:
-    st.bar_chart(df_vendor.set_index("vendor"))
+vendors = get_vendor_spend(st.session_state.user_id)
+st.bar_chart(vendors.set_index("vendor"))
 
 # -------------------------------------------------
-# Category Analytics
+# CATEGORY ANALYTICS
 # -------------------------------------------------
 st.subheader("🧩 Category Analytics")
-
-df_category = get_category_spend(st.session_state.user_id)
-if not df_category.empty:
-    st.bar_chart(df_category.set_index("category"))
+cats = get_category_spend(st.session_state.user_id)
+st.bar_chart(cats.set_index("category"))
 
 # -------------------------------------------------
-# Auto GST Report (Free format)
+# GST REPORT
 # -------------------------------------------------
 st.subheader("📑 Auto GST Report")
-
-if not df_invoices.empty:
-    gst_report = generate_gst_report(df_invoices)
-    st.json(gst_report)
+st.json(generate_gst_report(df))
 
 # -------------------------------------------------
-# Editable Excel Import
+# EXCEL EXPORT / IMPORT
 # -------------------------------------------------
-if can_edit(st.session_state.role):
-    st.subheader("✏ Editable Excel Sync")
+st.subheader("📂 Excel")
 
-    uploaded_excel = st.file_uploader(
-        "Upload Edited Excel (Invoices sheet)",
-        type=["xlsx"]
-    )
+excel_file = export_full_excel(df, gst, vendors)
+st.download_button(
+    "⬇ Download Excel Report",
+    excel_file,
+    file_name="gst_full_report.xlsx",
+    type="primary"
+)
+
+if editable:
+    uploaded_excel = st.file_uploader("Upload edited Excel", type=["xlsx"])
     if uploaded_excel:
         import_excel_and_sync(uploaded_excel)
-        show_toast("Excel synced with database")
+        st.toast("Excel synced")
         st.rerun()
-
-# -------------------------------------------------
-# Multi-sheet Excel Export
-# -------------------------------------------------
-if not df_invoices.empty:
-    excel_file = export_full_excel(
-        df_invoices,
-        df_gst,
-        df_vendor
-    )
-
-    st.download_button(
-        "⬇ Download Full Excel Report",
-        excel_file,
-        file_name="gst_full_report.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
