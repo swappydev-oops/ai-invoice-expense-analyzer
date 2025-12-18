@@ -12,7 +12,10 @@ def hash_password(password: str) -> str:
 def get_user_by_email(email):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, password_hash FROM users WHERE email = ?", (email,))
+    cursor.execute(
+        "SELECT id, password_hash FROM users WHERE email = ?",
+        (email,)
+    )
     user = cursor.fetchone()
     conn.close()
     return user
@@ -32,38 +35,36 @@ def create_user(email, password, company_name):
 def login_ui():
     st.subheader("🔐 Login")
 
-    email = st.text_input("Email")
-    password = st.text_input("Password", type="password")
+    email = st.text_input("Email", key="login_email")
+    password = st.text_input("Password", type="password", key="login_password")
 
-    if st.button("Login"):
+    if st.button("Login", key="login_button"):
         user = get_user_by_email(email)
 
         if not user:
             st.error("User not found")
-            return False
+            return
 
         user_id, password_hash = user
 
         if hash_password(password) != password_hash:
             st.error("Incorrect password")
-            return False
+            return
 
         st.session_state.user_id = user_id
         st.session_state.user_email = email
         st.success("Logged in successfully")
         st.rerun()
 
-    return False
-
 def register_ui():
     st.subheader("📝 Register")
 
-    email = st.text_input("Email")
-    company = st.text_input("Company Name")
-    password = st.text_input("Password", type="password")
-    confirm = st.text_input("Confirm Password", type="password")
+    email = st.text_input("Email", key="register_email")
+    company = st.text_input("Company Name", key="register_company")
+    password = st.text_input("Password", type="password", key="register_password")
+    confirm = st.text_input("Confirm Password", type="password", key="register_confirm")
 
-    if st.button("Register"):
+    if st.button("Register", key="register_button"):
         if password != confirm:
             st.error("Passwords do not match")
             return
