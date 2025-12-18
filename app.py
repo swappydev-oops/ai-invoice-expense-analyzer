@@ -3,22 +3,23 @@ import pandas as pd
 import time
 from PIL import Image
 from io import BytesIO
-from openpyxl.utils import get_column_letter
 
 from db.db import init_db
 from auth.auth import require_login
 from utils import extract_invoice_details
 from db.invoice_repo import (
     insert_invoice,
+    invoice_exists,
     get_invoices,
     update_invoice,
     delete_invoice,
     get_monthly_gst_summary,
-    invoice_exists
+    get_vendor_spend,
+    get_category_spend
 )
 
 # -------------------------------------------------
-# Safe Toast Helper (Streamlit version compatible)
+# Safe Toast Helper
 # -------------------------------------------------
 def show_toast(message):
     try:
@@ -27,25 +28,21 @@ def show_toast(message):
         st.success(message)
 
 # -------------------------------------------------
-# Initialize DB & Authentication
+# Init DB & Auth
 # -------------------------------------------------
 init_db()
 require_login()
 
-# -------------------------------------------------
-# Page Configuration
-# -------------------------------------------------
 st.set_page_config(
     page_title="AI Invoice & Expense Analyzer",
     layout="wide"
 )
 
 # -------------------------------------------------
-# Sidebar (User Info + Logout)
+# Sidebar
 # -------------------------------------------------
 with st.sidebar:
     st.write(f"👤 {st.session_state.user_email}")
-
     if st.button("Logout"):
         st.session_state.clear()
         show_toast("Logout successful 👋")
@@ -53,12 +50,12 @@ with st.sidebar:
         st.rerun()
 
 # -------------------------------------------------
-# Main Title
+# Title
 # -------------------------------------------------
-st.title("🧾 AI Invoice & Expense Analyzer")
+st.title("📊 AI Invoice & Expense Dashboard")
 
 # -------------------------------------------------
-# Session Guard (prevents duplicate inserts on rerun)
+# Upload session guard
 # -------------------------------------------------
 if "files_processed" not in st.session_state:
     st.session_state.files_processed = False
@@ -73,7 +70,7 @@ uploaded_files = st.file_uploader(
 )
 
 # -------------------------------------------------
-# Upload & OCR Processing → DB (with DUPLICATE VALIDATION)
+# Upload & OCR Processing (with duplicate validation)
 # -------------------------------------------------
 if uploaded_files and not st.session_state.files_processed:
 
@@ -83,7 +80,6 @@ if uploaded_files and not st.session_state.files_processed:
     for file in uploaded_files:
         try:
             with st.spinner(f"Processing {file.name}..."):
-
                 if file.type == "application/pdf":
                     data = extract_invoice_details(file, "pdf")
                 else:
@@ -93,7 +89,6 @@ if uploaded_files and not st.session_state.files_processed:
                 data["source_file"] = file.name
                 invoice_no = data.get("invoice_number")
 
-                # ---- DUPLICATE CHECK (PER USER) ----
                 if invoice_no and invoice_exists(
                     st.session_state.user_id,
                     invoice_no
@@ -101,10 +96,7 @@ if uploaded_files and not st.session_state.files_processed:
                     skipped_count += 1
                     continue
 
-                insert_invoice(
-                    user_id=st.session_state.user_id,
-                    data=data
-                )
+                insert_invoice(st.session_state.user_id, data)
                 inserted_count += 1
 
         except Exception as e:
@@ -112,7 +104,6 @@ if uploaded_files and not st.session_state.files_processed:
 
     st.session_state.files_processed = True
 
-    # ---- USER FEEDBACK ----
     if inserted_count > 0:
         show_toast(f"{inserted_count} invoice(s) uploaded successfully 🎉")
 
@@ -128,19 +119,19 @@ if not uploaded_files:
     st.session_state.files_processed = False
 
 # -------------------------------------------------
-# Load Invoices (USER-SCOPED)
+# Load invoices ONCE (canonical variable)
 # -------------------------------------------------
-df_db = get_invoices(st.session_state.user_id)
+df_invoices = get_invoices(st.session_state.user_id)
 
 # -------------------------------------------------
-# Invoice Management (Edit / Delete)
+# Invoice Management
 # -------------------------------------------------
-st.subheader("📊 Uploaded Invoices")
+st.subheader("🧾 Invoices")
 
-if not df_db.empty:
+if not df_invoices.empty:
 
     edited_df = st.data_editor(
-        df_db,
+        df_invoices,
         use_container_width=True,
         num_rows="fixed",
         key="invoice_editor"
@@ -148,20 +139,17 @@ if not df_db.empty:
 
     col1, col2 = st.columns(2)
 
-    # ---------------- Save Changes ----------------
     with col1:
         if st.button("💾 Save Changes"):
             for _, row in edited_df.iterrows():
                 update_invoice(row["id"], row.to_dict())
             show_toast("Invoices updated successfully")
 
-    # ---------------- Delete Invoice ----------------
     with col2:
         invoice_to_delete = st.selectbox(
             "🗑 Select Invoice ID to delete",
-            df_db["id"].tolist()
+            df_invoices["id"].tolist()
         )
-
         if st.button("Delete Invoice"):
             delete_invoice(invoice_to_delete)
             show_toast("Invoice deleted")
@@ -171,100 +159,59 @@ else:
     st.info("No invoices uploaded yet.")
 
 # -------------------------------------------------
-# Monthly GST Dashboard (SAFE & DEFENSIVE)
+# GST VALIDATION FLAGS
 # -------------------------------------------------
-st.subheader("📅 Monthly GST Summary")
+st.subheader("⚠ GST Validation Flags")
+
+if not df_invoices.empty:
+    gst_df = df_invoices.copy()
+    gst_df["expected_gst"] = (
+        gst_df["subtotal"] * gst_df["gst_percent"] / 100
+    ).round(2)
+    gst_df["gst_mismatch"] = gst_df["expected_gst"] != gst_df["tax"]
+
+    mismatches = gst_df[gst_df["gst_mismatch"]]
+
+    if not mismatches.empty:
+        st.dataframe(mismatches, use_container_width=True)
+    else:
+        st.success("No GST mismatches found 🎉")
+
+# -------------------------------------------------
+# Monthly Trend Line
+# -------------------------------------------------
+st.subheader("📈 Monthly Spend Trend")
 
 df_gst = get_monthly_gst_summary(st.session_state.user_id)
 
 if not df_gst.empty:
-
-    selected_month = st.selectbox(
-        "Select Month",
-        df_gst["month"].tolist()
-    )
-
-    filtered = df_gst[df_gst["month"] == selected_month]
-
-    if not filtered.empty:
-        row = filtered.iloc[0]
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Taxable Amount", f"₹ {row['taxable_amount']:,}")
-        c2.metric("GST Amount", f"₹ {row['gst_amount']:,}")
-        c3.metric("Total Spend", f"₹ {row['total_amount']:,}")
-    else:
-        st.warning("No data available for selected month.")
-
-    st.bar_chart(
-        df_gst.set_index("month")[["gst_amount"]],
+    st.line_chart(
+        df_gst.set_index("month")[["total_amount"]],
         use_container_width=True
     )
 
-else:
-    st.info("No GST data available yet.")
-
 # -------------------------------------------------
-# Multi-Sheet GST Excel Export
-# -------------------------------------------------
-if not df_db.empty:
-
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-
-        # Sheet 1: Invoices
-        df_db.drop(columns=["id"]).to_excel(
-            writer, index=False, sheet_name="Invoices"
-        )
-
-        # Sheet 2: Monthly GST Summary
-        df_gst.to_excel(
-            writer, index=False, sheet_name="Monthly_GST_Summary"
-        )
-
-        ws = writer.sheets["Invoices"]
-
-        for idx, col in enumerate(df_db.drop(columns=["id"]).columns, 1):
-            col_letter = get_column_letter(idx)
-            max_len = max(
-                df_db[col].astype(str).map(len).max(),
-                len(col)
-            )
-            ws.column_dimensions[col_letter].width = max_len + 3
-
-    output.seek(0)
-
-    st.download_button(
-        "⬇ Download GST Report (Excel)",
-        data=output,
-        file_name="gst_report.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-# -------------------------------------------------
-# GST VALIDATION FLAGS
-# -------------------------------------------------
-st.subheader("⚠ GST Validation")
-
-if not df.empty:
-    df["expected_gst"] = (df["subtotal"] * df["gst_percent"] / 100).round(2)
-    df["gst_mismatch"] = df["expected_gst"] != df["tax"]
-    st.dataframe(df[df["gst_mismatch"]])
-
-# -------------------------------------------------
-# VENDOR SPEND
+# Vendor-wise Spend
 # -------------------------------------------------
 st.subheader("🏢 Vendor-wise Spend")
 
-vendors = get_vendor_spend(st.session_state.user_id)
-if not vendors.empty:
-    st.bar_chart(vendors.set_index("vendor"))
+df_vendor = get_vendor_spend(st.session_state.user_id)
+
+if not df_vendor.empty:
+    st.bar_chart(
+        df_vendor.set_index("vendor"),
+        use_container_width=True
+    )
 
 # -------------------------------------------------
-# CATEGORY ANALYTICS
+# Category Analytics
 # -------------------------------------------------
-st.subheader("🧩 Category Analytics")
+st.subheader("🧩 Category-wise Spend")
 
-cats = get_category_spend(st.session_state.user_id)
-if not cats.empty:
-    st.bar_chart(cats.set_index("category"))
+df_category = get_category_spend(st.session_state.user_id)
+
+if not df_category.empty:
+    st.bar_chart(
+        df_category.set_index("category"),
+        use_container_width=True
+    )
