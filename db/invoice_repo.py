@@ -2,18 +2,13 @@ import pandas as pd
 from db.db import get_connection
 
 # -------------------------------------------------
-# CHECK DUPLICATE (PER USER)
+# DUPLICATE CHECK
 # -------------------------------------------------
 def invoice_exists(user_id, invoice_number):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        """
-        SELECT 1
-        FROM invoices
-        WHERE user_id = ? AND invoice_number = ?
-        LIMIT 1
-        """,
+        "SELECT 1 FROM invoices WHERE user_id = ? AND invoice_number = ?",
         (user_id, invoice_number)
     )
     exists = cursor.fetchone() is not None
@@ -21,24 +16,17 @@ def invoice_exists(user_id, invoice_number):
     return exists
 
 # -------------------------------------------------
-# INSERT (SAFE)
+# INSERT
 # -------------------------------------------------
 def insert_invoice(user_id, data: dict):
     conn = get_connection()
     cursor = conn.cursor()
-
     cursor.execute(
         """
         INSERT INTO invoices (
-            user_id,
-            invoice_number,
-            invoice_date,
-            subtotal,
-            gst_percent,
-            gst_amount,
-            total_amount,
-            category,
-            source_file
+            user_id, invoice_number, invoice_date,
+            subtotal, gst_percent, gst_amount,
+            total_amount, category, source_file
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -54,7 +42,6 @@ def insert_invoice(user_id, data: dict):
             data.get("source_file"),
         )
     )
-
     conn.commit()
     conn.close()
 
@@ -88,14 +75,12 @@ def get_invoices(user_id):
 # -------------------------------------------------
 # UPDATE
 # -------------------------------------------------
-def update_invoice(invoice_id, updated_row: dict):
+def update_invoice(invoice_id, row: dict):
     conn = get_connection()
     cursor = conn.cursor()
-
     cursor.execute(
         """
-        UPDATE invoices
-        SET
+        UPDATE invoices SET
             invoice_number = ?,
             invoice_date = ?,
             subtotal = ?,
@@ -106,17 +91,16 @@ def update_invoice(invoice_id, updated_row: dict):
         WHERE id = ?
         """,
         (
-            updated_row["invoice_number"],
-            updated_row["date"],
-            updated_row["subtotal"],
-            updated_row["gst_percent"],
-            updated_row["tax"],
-            updated_row["total_amount"],
-            updated_row["category"],
+            row["invoice_number"],
+            row["date"],
+            row["subtotal"],
+            row["gst_percent"],
+            row["tax"],
+            row["total_amount"],
+            row["category"],
             invoice_id
         )
     )
-
     conn.commit()
     conn.close()
 
@@ -139,13 +123,55 @@ def get_monthly_gst_summary(user_id):
         """
         SELECT
             strftime('%Y-%m', invoice_date) AS month,
-            ROUND(SUM(subtotal), 2) AS taxable_amount,
-            ROUND(SUM(gst_amount), 2) AS gst_amount,
-            ROUND(SUM(total_amount), 2) AS total_amount
+            SUM(subtotal) AS taxable_amount,
+            SUM(gst_amount) AS gst_amount,
+            SUM(total_amount) AS total_amount
         FROM invoices
         WHERE user_id = ?
         GROUP BY month
-        ORDER BY month DESC
+        ORDER BY month
+        """,
+        conn,
+        params=(user_id,)
+    )
+    conn.close()
+    return df
+
+# -------------------------------------------------
+# VENDOR-WISE SPEND
+# -------------------------------------------------
+def get_vendor_spend(user_id):
+    conn = get_connection()
+    df = pd.read_sql(
+        """
+        SELECT
+            invoice_number AS vendor,
+            SUM(total_amount) AS total_spend
+        FROM invoices
+        WHERE user_id = ?
+        GROUP BY vendor
+        ORDER BY total_spend DESC
+        """,
+        conn,
+        params=(user_id,)
+    )
+    conn.close()
+    return df
+
+# -------------------------------------------------
+# CATEGORY ANALYTICS
+# -------------------------------------------------
+def get_category_spend(user_id):
+    conn = get_connection()
+    df = pd.read_sql(
+        """
+        SELECT
+            category,
+            SUM(total_amount) AS total_spend
+        FROM invoices
+        WHERE user_id = ?
+        GROUP BY category
+        ORDER BY total_spend DESC
         """,
         conn,
         params=(user_id,)
