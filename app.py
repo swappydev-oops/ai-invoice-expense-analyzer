@@ -31,9 +31,12 @@ with st.sidebar:
 
     if st.button("Logout"):
         st.session_state.clear()
+        if hasattr(st, "toast"):
         st.toast("Logout successful 👋", icon="✅")
-        time.sleep(0.5)
-        st.rerun()
+    else:
+        st.success("Logout successful 👋")
+    time.sleep(0.3)
+    st.rerun()
 
 
 # -------------------------------------------------

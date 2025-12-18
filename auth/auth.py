@@ -3,13 +3,24 @@ import hashlib
 import time
 from db.db import get_connection
 
-# ---------------- Password Utilities ----------------
+# -------------------------------------------------
+# Toast Compatibility Helper (VERY IMPORTANT)
+# -------------------------------------------------
+def show_toast(message, icon="✅"):
+    if hasattr(st, "toast"):
+        st.toast(message, icon=icon)
+    else:
+        st.success(message)
 
+# -------------------------------------------------
+# Password Utilities
+# -------------------------------------------------
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
-# ---------------- DB Operations ----------------
-
+# -------------------------------------------------
+# Database Operations
+# -------------------------------------------------
 def get_user_by_email(email):
     conn = get_connection()
     cursor = conn.cursor()
@@ -25,14 +36,18 @@ def create_user(email, password, company_name):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO users (email, password_hash, company_name) VALUES (?, ?, ?)",
+        """
+        INSERT INTO users (email, password_hash, company_name)
+        VALUES (?, ?, ?)
+        """,
         (email, hash_password(password), company_name)
     )
     conn.commit()
     conn.close()
 
-# ---------------- Authentication UI ----------------
-
+# -------------------------------------------------
+# Login UI
+# -------------------------------------------------
 def login_ui():
     st.subheader("🔐 Login")
 
@@ -52,15 +67,17 @@ def login_ui():
             st.error("Incorrect password")
             return
 
-        # Set session
+        # Set session state
         st.session_state.user_id = user_id
         st.session_state.user_email = email
 
-        # Toast notification
-        st.toast("Login successful 🎉", icon="✅")
-        time.sleep(0.5)
+        show_toast("Login successful 🎉")
+        time.sleep(0.3)
         st.rerun()
 
+# -------------------------------------------------
+# Register UI
+# -------------------------------------------------
 def register_ui():
     st.subheader("📝 Register")
 
@@ -81,8 +98,9 @@ def register_ui():
         create_user(email, password, company)
         st.success("Account created successfully. Please login.")
 
-# ---------------- Auth Gate ----------------
-
+# -------------------------------------------------
+# Authentication Gate
+# -------------------------------------------------
 def require_login():
     if "user_id" not in st.session_state:
         tab1, tab2 = st.tabs(["Login", "Register"])
