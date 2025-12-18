@@ -1,115 +1,199 @@
 import streamlit as st
+import sqlite3
 import hashlib
 import time
-from db.db import get_connection
 
 # -------------------------------------------------
-# Toast Compatibility Helper (NO st.toast usage)
+# DB connection
 # -------------------------------------------------
-def show_toast(message):
-    """
-    Safe notification helper.
-    Works on ALL Streamlit versions.
-    """
-    try:
-        # Newer Streamlit
-        st.toast(message, icon="✅")
-    except Exception:
-        # Older Streamlit fallback
-        st.success(message)
+def get_conn():
+    return sqlite3.connect("data.db", check_same_thread=False)
 
 # -------------------------------------------------
-# Password Utilities
+# Password hash
 # -------------------------------------------------
-def hash_password(password: str) -> str:
+def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # -------------------------------------------------
-# Database Operations
+# Animated Background + UI CSS
 # -------------------------------------------------
-def get_user_by_email(email):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT id, password_hash FROM users WHERE email = ?",
-        (email,)
-    )
-    user = cursor.fetchone()
-    conn.close()
-    return user
-
-def create_user(email, password, company_name):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
+def load_auth_ui_css():
+    st.markdown(
         """
-        INSERT INTO users (email, password_hash, company_name)
-        VALUES (?, ?, ?)
+        <style>
+        /* -------- Page Background -------- */
+        .stApp {
+            background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* -------- Floating Invoice Cards -------- */
+        .invoice-bg {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        .invoice {
+            position: absolute;
+            width: 180px;
+            height: 240px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            animation: float 25s linear infinite;
+        }
+
+        .invoice::before {
+            content: "";
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            height: 10px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 6px;
+        }
+
+        @keyframes float {
+            from { transform: translateY(110vh); }
+            to { transform: translateY(-120vh); }
+        }
+
+        /* -------- Auth Card -------- */
+        .auth-card {
+            position: relative;
+            z-index: 10;
+            max-width: 420px;
+            margin: auto;
+            margin-top: 8vh;
+            background: white;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0px 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .auth-title {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .auth-subtitle {
+            text-align: center;
+            color: #6c757d;
+            margin-bottom: 2rem;
+        }
+
+        </style>
+
+        <!-- Floating invoice background -->
+        <div class="invoice-bg">
+            <div class="invoice" style="left:10%; animation-duration: 18s;"></div>
+            <div class="invoice" style="left:30%; animation-duration: 22s;"></div>
+            <div class="invoice" style="left:50%; animation-duration: 26s;"></div>
+            <div class="invoice" style="left:70%; animation-duration: 20s;"></div>
+            <div class="invoice" style="left:85%; animation-duration: 24s;"></div>
+        </div>
         """,
-        (email, hash_password(password), company_name)
+        unsafe_allow_html=True
     )
-    conn.commit()
-    conn.close()
 
 # -------------------------------------------------
 # Login UI
 # -------------------------------------------------
 def login_ui():
-    st.subheader("🔐 Login")
+    load_auth_ui_css()
+
+    st.markdown(
+        """
+        <div class="auth-card">
+            <div class="auth-title">Welcome Back 👋</div>
+            <div class="auth-subtitle">Login to manage your invoices</div>
+        """,
+        unsafe_allow_html=True
+    )
 
     email = st.text_input("Email", key="login_email")
     password = st.text_input("Password", type="password", key="login_password")
 
-    if st.button("Login", key="login_button"):
-        user = get_user_by_email(email)
+    if st.button("Login", use_container_width=True):
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, email, role, plan FROM users WHERE email = ? AND password = ?",
+            (email, hash_password(password))
+        )
+        user = cursor.fetchone()
+        conn.close()
 
-        if not user:
-            st.error("User not found")
-            return
+        if user:
+            st.session_state.user_id = user[0]
+            st.session_state.user_email = user[1]
+            st.session_state.role = user[2]
+            st.session_state.plan = user[3]
+            st.success("Login successful 🎉")
+            time.sleep(0.5)
+            st.rerun()
+        else:
+            st.error("Invalid email or password")
 
-        user_id, password_hash = user
-
-        if hash_password(password) != password_hash:
-            st.error("Incorrect password")
-            return
-
-        # Set session
-        st.session_state.user_id = user_id
-        st.session_state.user_email = email
-
-        show_toast("Login successful 🎉")
-        time.sleep(0.3)
-        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------------------------------
 # Register UI
 # -------------------------------------------------
 def register_ui():
-    st.subheader("📝 Register")
+    load_auth_ui_css()
 
-    email = st.text_input("Email", key="register_email")
-    company = st.text_input("Company Name", key="register_company")
-    password = st.text_input("Password", type="password", key="register_password")
-    confirm = st.text_input("Confirm Password", type="password", key="register_confirm")
+    st.markdown(
+        """
+        <div class="auth-card">
+            <div class="auth-title">Create Account ✨</div>
+            <div class="auth-subtitle">Start managing your invoices smarter</div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    if st.button("Register", key="register_button"):
-        if password != confirm:
-            st.error("Passwords do not match")
-            return
+    email = st.text_input("Email", key="reg_email")
+    password = st.text_input("Password", type="password", key="reg_password")
 
-        if get_user_by_email(email):
-            st.error("User already exists")
-            return
+    if st.button("Register", use_container_width=True):
+        conn = get_conn()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO users (email, password, role, plan)
+                VALUES (?, ?, 'user', 'free')
+                """,
+                (email, hash_password(password))
+            )
+            conn.commit()
+            st.success("Account created successfully 🎉")
+        except sqlite3.IntegrityError:
+            st.error("Email already exists")
+        finally:
+            conn.close()
 
-        create_user(email, password, company)
-        st.success("Account created successfully. Please login.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------------------------------
-# Authentication Gate
+# Auth Gate
 # -------------------------------------------------
 def require_login():
     if "user_id" not in st.session_state:
-        tab1, tab2 = st.tabs(["Login", "Register"])
+        tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
         with tab1:
             login_ui()
         with tab2:
