@@ -64,16 +64,17 @@ if uploaded_files:
 
         # ---------- Append to CSV History ----------
         if os.path.exists(HISTORY_FILE):
-    df_old = pd.read_csv(HISTORY_FILE)
-    df_final = pd.concat([df_old, df_new], ignore_index=True)
-else:
-    df_final = df_new
+            df_old = pd.read_csv(HISTORY_FILE)
+            df_final = pd.concat([df_old, df_new], ignore_index=True)
+        else:
+            df_final = df_new
 
-# ✅ Remove duplicate invoices
-df_final = df_final.drop_duplicates(
-    subset=["invoice_number", "vendor", "date", "source_file"],
-    keep="first"
-)
+        # ✅ Remove duplicate invoices
+        df_final = df_final.drop_duplicates(
+            subset=["invoice_number", "vendor", "date", "source_file"],
+            keep="first"
+        )
+
 
 
         # ---------- Rename columns for UI & Export ----------
