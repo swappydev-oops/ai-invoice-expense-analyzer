@@ -53,7 +53,9 @@ if uploaded_files:
         df_final.to_csv(HISTORY_FILE, index=False)
 
         st.download_button(
-            label="⬇ Download Full Invoice History (CSV)",
-            data=df_final.to_csv(index=False).encode("utf-8"),
-            file_name="invoice_history.csv",
-            mime="tex
+    label="⬇ Download Full Invoice History (CSV)",
+    data=df_final.to_csv(index=False).encode("utf-8"),
+    file_name="invoice_history.csv",
+    mime="text/csv"
+)
+
