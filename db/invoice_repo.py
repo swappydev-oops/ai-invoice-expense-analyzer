@@ -1,10 +1,9 @@
 import pandas as pd
 from db.db import get_connection
-from db.invoice_repo import get_monthly_gst_summary
 
-
-# ---------------- CREATE ----------------
-
+# -------------------------------------------------
+# CREATE
+# -------------------------------------------------
 def insert_invoice(user_id, data: dict):
     conn = get_connection()
     cursor = conn.cursor()
@@ -12,9 +11,15 @@ def insert_invoice(user_id, data: dict):
     cursor.execute(
         """
         INSERT INTO invoices (
-            user_id, invoice_number, invoice_date,
-            subtotal, gst_percent, gst_amount,
-            total_amount, category, source_file
+            user_id,
+            invoice_number,
+            invoice_date,
+            subtotal,
+            gst_percent,
+            gst_amount,
+            total_amount,
+            category,
+            source_file
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -34,8 +39,9 @@ def insert_invoice(user_id, data: dict):
     conn.commit()
     conn.close()
 
-# ---------------- READ ----------------
-
+# -------------------------------------------------
+# READ (User-specific invoices)
+# -------------------------------------------------
 def get_invoices(user_id):
     conn = get_connection()
     df = pd.read_sql(
@@ -60,8 +66,9 @@ def get_invoices(user_id):
     conn.close()
     return df
 
-# ---------------- UPDATE ----------------
-
+# -------------------------------------------------
+# UPDATE
+# -------------------------------------------------
 def update_invoice(invoice_id, updated_row: dict):
     conn = get_connection()
     cursor = conn.cursor()
@@ -69,7 +76,8 @@ def update_invoice(invoice_id, updated_row: dict):
     cursor.execute(
         """
         UPDATE invoices
-        SET invoice_number = ?,
+        SET
+            invoice_number = ?,
             invoice_date = ?,
             subtotal = ?,
             gst_percent = ?,
@@ -93,8 +101,9 @@ def update_invoice(invoice_id, updated_row: dict):
     conn.commit()
     conn.close()
 
-# ---------------- DELETE ----------------
-
+# -------------------------------------------------
+# DELETE
+# -------------------------------------------------
 def delete_invoice(invoice_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -102,6 +111,9 @@ def delete_invoice(invoice_id):
     conn.commit()
     conn.close()
 
+# -------------------------------------------------
+# MONTHLY GST SUMMARY (REQUIRED)
+# -------------------------------------------------
 def get_monthly_gst_summary(user_id):
     conn = get_connection()
     df = pd.read_sql(
@@ -121,4 +133,3 @@ def get_monthly_gst_summary(user_id):
     )
     conn.close()
     return df
-
