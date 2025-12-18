@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 from db.db import init_db
+from auth.auth import require_login
 init_db()
+require_login()
 from PIL import Image
 import os
 from io import BytesIO
@@ -18,6 +20,12 @@ st.set_page_config(
 )
 
 st.title("🧾 AI Invoice & Expense Analyzer (v2)")
+
+with st.sidebar:
+    st.write(f"👤 {st.session_state.user_email}")
+    if st.button("Logout"):
+        st.session_state.clear()
+        st.rerun()
 
 # -------------------------------------------------
 # File Upload

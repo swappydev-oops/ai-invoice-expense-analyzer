@@ -1,0 +1,87 @@
+import streamlit as st
+import hashlib
+from db.db import get_connection
+
+# ---------------- Password Utilities ----------------
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# ---------------- DB Operations ----------------
+
+def get_user_by_email(email):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, password_hash FROM users WHERE email = ?", (email,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+def create_user(email, password, company_name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO users (email, password_hash, company_name) VALUES (?, ?, ?)",
+        (email, hash_password(password), company_name)
+    )
+    conn.commit()
+    conn.close()
+
+# ---------------- Authentication UI ----------------
+
+def login_ui():
+    st.subheader("🔐 Login")
+
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        user = get_user_by_email(email)
+
+        if not user:
+            st.error("User not found")
+            return False
+
+        user_id, password_hash = user
+
+        if hash_password(password) != password_hash:
+            st.error("Incorrect password")
+            return False
+
+        st.session_state.user_id = user_id
+        st.session_state.user_email = email
+        st.success("Logged in successfully")
+        st.rerun()
+
+    return False
+
+def register_ui():
+    st.subheader("📝 Register")
+
+    email = st.text_input("Email")
+    company = st.text_input("Company Name")
+    password = st.text_input("Password", type="password")
+    confirm = st.text_input("Confirm Password", type="password")
+
+    if st.button("Register"):
+        if password != confirm:
+            st.error("Passwords do not match")
+            return
+
+        if get_user_by_email(email):
+            st.error("User already exists")
+            return
+
+        create_user(email, password, company)
+        st.success("Account created. Please login.")
+
+# ---------------- Auth Gate ----------------
+
+def require_login():
+    if "user_id" not in st.session_state:
+        tab1, tab2 = st.tabs(["Login", "Register"])
+        with tab1:
+            login_ui()
+        with tab2:
+            register_ui()
+        st.stop()
