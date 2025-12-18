@@ -4,7 +4,7 @@ from PIL import Image
 import os
 from io import BytesIO
 from openpyxl.utils import get_column_letter
-
+import time
 from db.db import init_db, get_connection
 from auth.auth import require_login
 from utils import extract_invoice_details
@@ -30,10 +30,10 @@ with st.sidebar:
     st.write(f"👤 {st.session_state.user_email}")
 
     if st.button("Logout"):
-        st.session_state.clear()
-        st.toast("Logout successful 👋", icon="✅")
-        st.sleep(0.5)
-        st.rerun()
+    st.session_state.clear()
+    st.toast("Logout successful 👋", icon="✅")
+    time.sleep(0.5)
+    st.rerun()
 
 # -------------------------------------------------
 # Main Title
@@ -134,10 +134,18 @@ if uploaded_files:
 # Load User Invoices from DB
 # -------------------------------------------------
 conn = get_connection()
+
 df_db = pd.read_sql(
     """
-    SELECT invoice_number, date, subtotal, tax, gst_percent,
-           total_amount, category, source_file
+    SELECT
+        invoice_number,
+        invoice_date AS date,
+        subtotal,
+        gst_amount AS tax,
+        gst_percent,
+        total_amount,
+        category,
+        source_file
     FROM invoices
     WHERE user_id = ?
     ORDER BY created_at DESC
@@ -145,7 +153,9 @@ df_db = pd.read_sql(
     conn,
     params=(st.session_state.user_id,)
 )
+
 conn.close()
+
 
 if not df_db.empty:
     df_display = df_db.rename(columns=DISPLAY_COLUMN_MAPPING)

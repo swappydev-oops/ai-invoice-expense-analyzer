@@ -1,5 +1,6 @@
 import streamlit as st
 import hashlib
+import time
 from db.db import get_connection
 
 # ---------------- Password Utilities ----------------
@@ -57,7 +58,7 @@ def login_ui():
 
         # Toast notification
         st.toast("Login successful 🎉", icon="✅")
-        st.sleep(0.5)
+        time.sleep(0.5)
         st.rerun()
 
 def register_ui():
