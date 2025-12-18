@@ -51,9 +51,13 @@ def login_ui():
             st.error("Incorrect password")
             return
 
+        # Set session
         st.session_state.user_id = user_id
         st.session_state.user_email = email
-        st.success("Logged in successfully")
+
+        # Toast notification
+        st.toast("Login successful 🎉", icon="✅")
+        st.sleep(0.5)
         st.rerun()
 
 def register_ui():
@@ -74,7 +78,7 @@ def register_ui():
             return
 
         create_user(email, password, company)
-        st.success("Account created. Please login.")
+        st.success("Account created successfully. Please login.")
 
 # ---------------- Auth Gate ----------------
 
