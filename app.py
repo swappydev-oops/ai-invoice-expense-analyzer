@@ -2,35 +2,53 @@ import streamlit as st
 import pandas as pd
 from PIL import Image
 from utils import extract_invoice_details_from_image
+import os
+from pdf2image import convert_from_bytes
 
-st.set_page_config(page_title="AI Invoice & Expense Analyzer", layout="centered")
-st.title("🧾 AI Invoice & Expense Analyzer for MSMEs")
+st.set_page_config(page_title="AI Invoice & Expense Analyzer", layout="wide")
+st.title("🧾 AI Invoice & Expense Analyzer (v2)")
 
-uploaded_file = st.file_uploader(
-    "Upload Invoice Image",
-    type=["png", "jpg", "jpeg"]
+uploaded_files = st.file_uploader(
+    "Upload Invoices (Images or PDFs)",
+    type=["png", "jpg", "jpeg", "pdf"],
+    accept_multiple_files=True
 )
 
-if uploaded_file:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Invoice", use_column_width=True)
+history_file = "invoice_history.csv"
+all_data = []
 
-    with st.spinner("Analyzing invoice using AI..."):
-        try:
-            data = extract_invoice_details_from_image(image)
+if uploaded_files:
+    for file in uploaded_files:
+        images = []
 
-            df = pd.DataFrame([data])
-            st.success("Invoice extracted successfully")
-            st.dataframe(df)
+        if file.type == "application/pdf":
+            images = convert_from_bytes(file.read())
+        else:
+            images = [Image.open(file)]
 
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "⬇ Download Excel",
-                csv,
-                "invoice_expenses.csv",
-                "text/csv"
-            )
+        for img in images:
+            with st.spinner(f"Processing {file.name}..."):
+                try:
+                    data = extract_invoice_details_from_image(img)
+                    all_data.append(data)
+                except Exception as e:
+                    st.error(f"{file.name}: {str(e)}")
 
-        except Exception as e:
-            st.error("AI response could not be parsed.")
-            st.code(str(e))
+    if all_data:
+        df = pd.DataFrame(all_data)
+        st.success("Invoices processed successfully")
+        st.dataframe(df)
+
+        # ---------- CSV APPEND ----------
+        if os.path.exists(history_file):
+            old = pd.read_csv(history_file)
+            df = pd.concat([old, df], ignore_index=True)
+
+        df.to_csv(history_file, index=False)
+
+        st.download_button(
+            "⬇ Download Full Invoice History",
+            df.to_csv(index=False).encode("utf-8"),
+            "invoice_history.csv",
+            "text/csv"
+        )
