@@ -61,53 +61,49 @@ if uploaded_files:
             st.error(f"{file.name}: {str(e)}")
 
     if all_data:
+        # -------- CURRENT BATCH --------
         df_new = pd.DataFrame(all_data)
 
-        # -------- Load history (RAW, not renamed) --------
+        # -------- LOAD RAW HISTORY --------
         if os.path.exists(HISTORY_FILE):
             df_old = pd.read_csv(HISTORY_FILE)
             df_final = pd.concat([df_old, df_new], ignore_index=True)
         else:
-            df_final = df_new
+            df_final = df_new.copy()
 
-        # -------- Data cleanup (RAW columns only) --------
-
-        # Date normalization
+        # -------- DATA CLEANUP (RAW ONLY) --------
         df_final["date"] = pd.to_datetime(
             df_final["date"], errors="coerce", dayfirst=True
         ).dt.strftime("%Y-%m-%d")
 
-        # Numeric columns
         NUMERIC_COLUMNS = ["subtotal", "tax", "gst_percent", "total_amount"]
         for col in NUMERIC_COLUMNS:
             df_final[col] = pd.to_numeric(df_final[col], errors="coerce")
 
-        # Confidence → percentage
         CONF_COLS = [c for c in df_final.columns if c.endswith("_conf")]
         for col in CONF_COLS:
             df_final[col] = (df_final[col] * 100).round(0)
 
-        # Deduplicate
+        # -------- DEDUPLICATION --------
         df_final = df_final.drop_duplicates(
             subset=["invoice_number", "vendor", "date", "source_file"],
             keep="first"
         )
 
-        # -------- Create DISPLAY dataframe (ONLY ONCE) --------
-        df_display = df_final.rename(columns=DISPLAY_COLUMN_MAPPING)
+        # -------- SAVE RAW HISTORY --------
+        df_final.to_csv(HISTORY_FILE, index=False)
 
-        # Defensive: ensure no duplicate column names
-        df_display = df_display.loc[:, ~df_display.columns.duplicated()]
+        # -------- UI DISPLAY (ONLY CURRENT UPLOAD) --------
+        df_new_display = df_new.rename(columns=DISPLAY_COLUMN_MAPPING)
+        st.success(f"{len(df_new_display)} invoices processed successfully")
+        st.dataframe(df_new_display, use_container_width=True)
 
-        # -------- Save & Display --------
-        st.success("Invoices processed successfully")
-        st.dataframe(df_display, use_container_width=True)
-
-        df_display.to_csv(HISTORY_FILE, index=False)
+        # -------- DOWNLOAD FULL HISTORY --------
+        df_final_display = df_final.rename(columns=DISPLAY_COLUMN_MAPPING)
 
         st.download_button(
-            label="⬇ Download Invoice History (CSV)",
-            data=df_display.to_csv(index=False).encode("utf-8"),
+            label="⬇ Download Full Invoice History (CSV)",
+            data=df_final_display.to_csv(index=False).encode("utf-8"),
             file_name="invoice_history.csv",
             mime="text/csv"
         )
