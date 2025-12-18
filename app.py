@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from PIL import Image
 import os
+from io import BytesIO
 
 from utils import extract_invoice_details
 
@@ -90,20 +91,43 @@ if uploaded_files:
             keep="first"
         )
 
-        # -------- SAVE RAW HISTORY --------
+        # -------- SAVE RAW HISTORY (CSV) --------
         df_final.to_csv(HISTORY_FILE, index=False)
 
-        # -------- UI DISPLAY (ONLY CURRENT UPLOAD) --------
+        # -------- UI DISPLAY (CURRENT UPLOAD ONLY) --------
         df_new_display = df_new.rename(columns=DISPLAY_COLUMN_MAPPING)
         st.success(f"{len(df_new_display)} invoices processed successfully")
         st.dataframe(df_new_display, use_container_width=True)
 
-        # -------- DOWNLOAD FULL HISTORY --------
+        # -------- EXCEL EXPORT (FORMATTED) --------
         df_final_display = df_final.rename(columns=DISPLAY_COLUMN_MAPPING)
 
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df_final_display.to_excel(writer, index=False, sheet_name="Invoices")
+            worksheet = writer.sheets["Invoices"]
+
+            # Auto column width
+            for idx, col in enumerate(df_final_display.columns, 1):
+                max_len = max(
+                    df_final_display[col].astype(str).map(len).max(),
+                    len(col)
+                )
+                worksheet.column_dimensions[chr(64 + idx)].width = max_len + 3
+
+            # Formatting rows
+            for row in range(2, len(df_final_display) + 2):
+                worksheet[f"E{row}"].number_format = "YYYY-MM-DD"
+                worksheet[f"G{row}"].number_format = "#,##0"
+                worksheet[f"I{row}"].number_format = "#,##0"
+                worksheet[f"J{row}"].number_format = "0.00%"
+                worksheet[f"L{row}"].number_format = "#,##0"
+
+        output.seek(0)
+
         st.download_button(
-            label="⬇ Download Full Invoice History (CSV)",
-            data=df_final_display.to_csv(index=False).encode("utf-8"),
-            file_name="invoice_history.csv",
-            mime="text/csv"
+            label="⬇ Download Invoice History (Excel)",
+            data=output,
+            file_name="invoice_history.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
