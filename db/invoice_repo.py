@@ -2,7 +2,7 @@ import pandas as pd
 from db.db import get_connection
 
 # -------------------------------------------------
-# CREATE
+# INSERT (NO DUPLICATES PER USER)
 # -------------------------------------------------
 def insert_invoice(user_id, data: dict):
     conn = get_connection()
@@ -10,7 +10,7 @@ def insert_invoice(user_id, data: dict):
 
     cursor.execute(
         """
-        INSERT INTO invoices (
+        INSERT OR IGNORE INTO invoices (
             user_id,
             invoice_number,
             invoice_date,
@@ -40,7 +40,7 @@ def insert_invoice(user_id, data: dict):
     conn.close()
 
 # -------------------------------------------------
-# READ (User-specific invoices)
+# READ (USER-SCOPED)
 # -------------------------------------------------
 def get_invoices(user_id):
     conn = get_connection()
@@ -112,7 +112,7 @@ def delete_invoice(invoice_id):
     conn.close()
 
 # -------------------------------------------------
-# MONTHLY GST SUMMARY (REQUIRED)
+# MONTHLY GST SUMMARY
 # -------------------------------------------------
 def get_monthly_gst_summary(user_id):
     conn = get_connection()

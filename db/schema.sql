@@ -19,8 +19,7 @@ CREATE TABLE IF NOT EXISTS vendors (
 CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    vendor_id INTEGER,
-    invoice_number TEXT,
+    invoice_number TEXT NOT NULL,
     invoice_date DATE,
     subtotal REAL,
     gst_percent REAL,
@@ -30,8 +29,9 @@ CREATE TABLE IF NOT EXISTS invoices (
     source_file TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+    UNIQUE (user_id, invoice_number),
+
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- VALIDATIONS
