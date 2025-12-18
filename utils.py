@@ -1,39 +1,47 @@
-import google.generativeai as genai
+import requests
+import re
 from categories import EXPENSE_CATEGORIES
-import json
 
-genai.configure(api_key="AIzaSyBILsz7OLnwsFgvPOgumnjb74xF1aTGi24")
+API_KEY = "K85063436188957"
 
 def extract_invoice_details_from_image(image):
-    model = genai.GenerativeModel("gemini-1.0-pro-vision")
+    import io
+    from PIL import Image
 
-    prompt = f"""
-    You are an API.
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    img_bytes = buffered.getvalue()
 
-    Read the invoice image and return ONLY valid JSON.
-    No explanation.
-    No markdown.
-
-    JSON format (ALL keys mandatory):
-    {{
-      "invoice_number": "",
-      "vendor": "",
-      "date": "",
-      "total_amount": "",
-      "tax": "",
-      "category": ""
-    }}
-
-    Category must be one of:
-    {EXPENSE_CATEGORIES}
-    """
-
-    response = model.generate_content(
-        [prompt, image],
-        generation_config={"temperature": 0}
+    response = requests.post(
+        "https://api.ocr.space/parse/image",
+        files={"image": img_bytes},
+        data={"apikey": API_KEY, "language": "eng"}
     )
 
-    raw_text = response.text.strip()
-    raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+    result = response.json()
+    text = result.get("ParsedResults")[0].get("ParsedText", "")
 
-    return json.loads(raw_text)
+    # Simple extraction logic
+    invoice_number = re.search(r"Invoice\s*No[:\s]*([A-Za-z0-9-]+)", text)
+    date = re.search(r"Date[:\s]*([0-9/-]+)", text)
+    total_amount = re.search(r"Total.*?([0-9,.]+)", text)
+    vendor_match = text.strip().split("\n")[0] if text else ""
+
+    tax = re.search(r"(GST|Tax).*?([0-9,.]+)", text)
+
+    data = {
+        "invoice_number": invoice_number.group(1) if invoice_number else "",
+        "vendor": vendor_match,
+        "date": date.group(1) if date else "",
+        "total_amount": total_amount.group(1) if total_amount else "",
+        "tax": tax.group(2) if tax else "",
+        "category": ""
+    }
+
+    # Basic category rule
+    if data["total_amount"] and float(data["total_amount"].replace(",", "")) > 1000:
+        data["category"] = EXPENSE_CATEGORIES[0]
+    else:
+        data["category"] = EXPENSE_CATEGORIES[-1]
+
+    return data
