@@ -9,9 +9,6 @@ OCR_API_KEY = "K85063436188957"
 
 
 def normalize_date(date_str):
-    """
-    Converts date like 05-Aug-2024 → 2024-08-05
-    """
     try:
         return datetime.datetime.strptime(date_str, "%d-%b-%Y").strftime("%Y-%m-%d")
     except Exception:
@@ -22,7 +19,7 @@ def calculate_gst_percentage(subtotal, tax):
     try:
         subtotal = float(subtotal.replace(",", ""))
         tax = float(tax.replace(",", ""))
-        return round((tax / subtotal) * 100, 2) if subtotal > 0 else 0
+        return round((tax / subtotal) * 100, 2)
     except Exception:
         return 0
 
@@ -31,27 +28,49 @@ def confidence(found: bool):
     return round(0.95 if found else 0.3, 2)
 
 
-def extract_invoice_details_from_image(image):
-    # ---------- Image → Base64 ----------
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    image_base64 = base64.b64encode(buffer.getvalue()).decode()
-
-    payload = {
-        "apikey": OCR_API_KEY,
-        "base64Image": f"data:image/png;base64,{image_base64}",
-        "language": "eng",
-        "OCREngine": 2
-    }
-
+def call_ocr_space(payload, files=None):
     response = requests.post(
         "https://api.ocr.space/parse/image",
         data=payload,
-        timeout=30
+        files=files,
+        timeout=60
     )
+    return response.json()
 
-    result = response.json()
 
+def extract_invoice_details(file, file_type):
+    """
+    file_type: 'image' or 'pdf'
+    """
+
+    # ---------- OCR CALL ----------
+    if file_type == "image":
+        buffer = io.BytesIO()
+        file.save(buffer, format="PNG")
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+        payload = {
+            "apikey": OCR_API_KEY,
+            "base64Image": f"data:image/png;base64,{img_base64}",
+            "language": "eng",
+            "OCREngine": 2
+        }
+
+        result = call_ocr_space(payload)
+
+    else:  # PDF
+        payload = {
+            "apikey": OCR_API_KEY,
+            "language": "eng",
+            "OCREngine": 2
+        }
+
+        result = call_ocr_space(
+            payload,
+            files={"file": file}
+        )
+
+    # ---------- ERROR HANDLING ----------
     if result.get("IsErroredOnProcessing"):
         raise Exception(result.get("ErrorMessage", "OCR failed"))
 
@@ -61,7 +80,7 @@ def extract_invoice_details_from_image(image):
 
     text = parsed[0].get("ParsedText", "")
 
-    # ---------- REGEX EXTRACTION ----------
+    # ---------- FIELD EXTRACTION ----------
     invoice_no = re.search(r"Invoice\s*No[:\s]*([A-Za-z0-9-]+)", text, re.I)
     date_raw = re.search(r"Invoice\s*Date[:\s]*([0-9]{2}-[A-Za-z]{3}-[0-9]{4})", text, re.I)
     vendor = re.search(r"Vendor\s*Name[:\s]*\n\s*(.+)", text, re.I)
@@ -74,7 +93,6 @@ def extract_invoice_details_from_image(image):
 
     gst_percent = calculate_gst_percentage(subtotal_val, tax_val)
 
-    # ---------- CATEGORY ----------
     category = "Other"
     if "software" in text.lower():
         category = "Software / Subscriptions"
