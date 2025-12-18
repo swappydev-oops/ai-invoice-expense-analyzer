@@ -73,11 +73,14 @@ if uploaded_files:
             df_final = df_new.copy()
 
         # -------- Cleanup (RAW columns only) --------
+        # Normalize date
         df_final["date"] = pd.to_datetime(
             df_final["date"], errors="coerce", dayfirst=True
         ).dt.strftime("%Y-%m-%d")
 
+        # Define numeric columns (FIX for NameError)
         NUMERIC_COLUMNS = ["subtotal", "tax", "gst_percent", "total_amount"]
-for col in NUMERIC_COLUMNS:
-    df_final[col] = pd.to_numeric(df_final[col], errors="coerce")
+        for col in NUMERIC_COLUMNS:
+        df_final[col] = pd.to_numeric(df_final[col], errors="coerce")
+
 
