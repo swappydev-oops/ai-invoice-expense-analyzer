@@ -78,5 +78,6 @@ if uploaded_files:
         ).dt.strftime("%Y-%m-%d")
 
         NUMERIC_COLUMNS = ["subtotal", "tax", "gst_percent", "total_amount"]
-        for col in NUMERIC_COLUMNS:
-            df_final[col] = pd.to_numeric(df_final[col], error_
+for col in NUMERIC_COLUMNS:
+    df_final[col] = pd.to_numeric(df_final[col], errors="coerce")
+
