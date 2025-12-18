@@ -5,12 +5,18 @@ from PIL import Image
 from io import BytesIO
 from openpyxl.utils import get_column_letter
 
-from db.db import init_db, get_connection
+from db.db import init_db
 from auth.auth import require_login
+from db.invoice_repo import (
+    insert_invoice,
+    get_invoices,
+    update_invoice,
+    delete_invoice
+)
 from utils import extract_invoice_details
 
 # -------------------------------------------------
-# Safe Toast Helper (NO direct st.toast usage)
+# Safe Toast Helper (works on all Streamlit versions)
 # -------------------------------------------------
 def show_toast(message):
     try:
@@ -59,129 +65,91 @@ uploaded_files = st.file_uploader(
 )
 
 # -------------------------------------------------
-# Column Display Mapping (UI & Excel)
+# Upload & OCR Processing
 # -------------------------------------------------
-DISPLAY_COLUMN_MAPPING = {
-    "invoice_number": "Invoice Number",
-    "date": "Invoice Date",
-    "subtotal": "Subtotal Amount",
-    "tax": "GST Amount",
-    "gst_percent": "GST %",
-    "total_amount": "Total Amount",
-    "category": "Category",
-    "source_file": "Source File"
-}
-
-# -------------------------------------------------
-# Process Uploaded Invoices
-# -------------------------------------------------
-all_data = []
-
 if uploaded_files:
     for file in uploaded_files:
         try:
             with st.spinner(f"Processing {file.name}..."):
                 if file.type == "application/pdf":
-                    record = extract_invoice_details(file, "pdf")
+                    data = extract_invoice_details(file, "pdf")
                 else:
                     image = Image.open(file)
-                    record = extract_invoice_details(image, "image")
+                    data = extract_invoice_details(image, "image")
 
-                record["source_file"] = file.name
-                all_data.append(record)
+                data["source_file"] = file.name
+
+                insert_invoice(
+                    user_id=st.session_state.user_id,
+                    data=data
+                )
 
         except Exception as e:
             st.error(f"{file.name}: {str(e)}")
 
-    if all_data:
-        df_new = pd.DataFrame(all_data)
-
-        # ---------------- Save to Database ----------------
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        user_id = st.session_state.user_id
-
-        for _, row in df_new.iterrows():
-            cursor.execute(
-                """
-                INSERT INTO invoices (
-                    user_id,
-                    invoice_number,
-                    invoice_date,
-                    subtotal,
-                    gst_percent,
-                    gst_amount,
-                    total_amount,
-                    category,
-                    source_file
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    row.get("invoice_number"),
-                    row.get("date"),
-                    row.get("subtotal"),
-                    row.get("gst_percent"),
-                    row.get("tax"),
-                    row.get("total_amount"),
-                    row.get("category"),
-                    row.get("source_file")
-                )
-            )
-
-        conn.commit()
-        conn.close()
-
-        show_toast(f"{len(df_new)} invoice(s) uploaded successfully 🎉")
+    show_toast("Invoice(s) uploaded successfully 🎉")
+    st.rerun()
 
 # -------------------------------------------------
-# Load Invoices from Database (Current User)
+# Load Invoices from DB (Current User Only)
 # -------------------------------------------------
-conn = get_connection()
-
-df_db = pd.read_sql(
-    """
-    SELECT
-        invoice_number,
-        invoice_date AS date,
-        subtotal,
-        gst_amount AS tax,
-        gst_percent,
-        total_amount,
-        category,
-        source_file
-    FROM invoices
-    WHERE user_id = ?
-    ORDER BY created_at DESC
-    """,
-    conn,
-    params=(st.session_state.user_id,)
-)
-
-conn.close()
+df_db = get_invoices(st.session_state.user_id)
 
 # -------------------------------------------------
-# Display & Export
+# Invoice Management Section
 # -------------------------------------------------
+st.subheader("📊 Uploaded Invoices")
+
 if not df_db.empty:
-    df_display = df_db.rename(columns=DISPLAY_COLUMN_MAPPING)
 
-    st.subheader("📊 Uploaded Invoices")
-    st.dataframe(df_display, use_container_width=True)
+    # ---------------- Editable Table ----------------
+    edited_df = st.data_editor(
+        df_db,
+        use_container_width=True,
+        num_rows="fixed",
+        key="invoice_editor"
+    )
 
-    # ---------------- Excel Export ----------------
+    col1, col2 = st.columns(2)
+
+    # ---------------- Save Changes ----------------
+    with col1:
+        if st.button("💾 Save Changes"):
+            for _, row in edited_df.iterrows():
+                update_invoice(row["id"], row.to_dict())
+
+            show_toast("Invoices updated successfully")
+            st.rerun()
+
+    # ---------------- Delete Invoice ----------------
+    with col2:
+        invoice_to_delete = st.selectbox(
+            "🗑 Select Invoice ID to delete",
+            df_db["id"].tolist()
+        )
+
+        if st.button("Delete Invoice"):
+            delete_invoice(invoice_to_delete)
+            show_toast("Invoice deleted")
+            st.rerun()
+
+    # -------------------------------------------------
+    # Excel Export (DB → Excel)
+    # -------------------------------------------------
+    st.subheader("⬇ Download Invoice History")
+
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_display.to_excel(writer, index=False, sheet_name="Invoices")
+        df_db.drop(columns=["id"]).to_excel(
+            writer, index=False, sheet_name="Invoices"
+        )
         ws = writer.sheets["Invoices"]
 
         # Auto column width
-        for idx, col in enumerate(df_display.columns, 1):
+        for idx, col in enumerate(df_db.drop(columns=["id"]).columns, 1):
             col_letter = get_column_letter(idx)
             max_len = max(
-                df_display[col].astype(str).map(len).max(),
+                df_db[col].astype(str).map(len).max(),
                 len(col)
             )
             ws.column_dimensions[col_letter].width = max_len + 3
@@ -189,7 +157,7 @@ if not df_db.empty:
     output.seek(0)
 
     st.download_button(
-        "⬇ Download Invoice History (Excel)",
+        label="Download Excel",
         data=output,
         file_name="invoice_history.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
