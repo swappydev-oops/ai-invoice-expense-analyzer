@@ -17,7 +17,7 @@ from db.invoice_repo import (
 )
 
 # -------------------------------------------------
-# Safe Toast Helper (works on all Streamlit versions)
+# Safe Toast Helper
 # -------------------------------------------------
 def show_toast(message):
     try:
@@ -26,13 +26,13 @@ def show_toast(message):
         st.success(message)
 
 # -------------------------------------------------
-# Initialize DB & Authentication
+# Init
 # -------------------------------------------------
 init_db()
 require_login()
 
 # -------------------------------------------------
-# Page Configuration
+# Page Config
 # -------------------------------------------------
 st.set_page_config(
     page_title="AI Invoice & Expense Analyzer",
@@ -40,11 +40,10 @@ st.set_page_config(
 )
 
 # -------------------------------------------------
-# Sidebar (User Info + Logout)
+# Sidebar
 # -------------------------------------------------
 with st.sidebar:
     st.write(f"👤 {st.session_state.user_email}")
-
     if st.button("Logout"):
         st.session_state.clear()
         show_toast("Logout successful 👋")
@@ -52,12 +51,18 @@ with st.sidebar:
         st.rerun()
 
 # -------------------------------------------------
-# Main Title
+# Title
 # -------------------------------------------------
 st.title("🧾 AI Invoice & Expense Analyzer")
 
 # -------------------------------------------------
-# File Upload
+# Session flag (CRITICAL FIX)
+# -------------------------------------------------
+if "files_processed" not in st.session_state:
+    st.session_state.files_processed = False
+
+# -------------------------------------------------
+# Upload
 # -------------------------------------------------
 uploaded_files = st.file_uploader(
     "Upload Invoice Images or PDFs",
@@ -66,9 +71,10 @@ uploaded_files = st.file_uploader(
 )
 
 # -------------------------------------------------
-# Upload & OCR Processing → Database
+# Process Uploads (ONLY ONCE)
 # -------------------------------------------------
-if uploaded_files:
+if uploaded_files and not st.session_state.files_processed:
+
     for file in uploaded_files:
         try:
             with st.spinner(f"Processing {file.name}..."):
@@ -79,25 +85,27 @@ if uploaded_files:
                     data = extract_invoice_details(image, "image")
 
                 data["source_file"] = file.name
-
-                insert_invoice(
-                    user_id=st.session_state.user_id,
-                    data=data
-                )
+                insert_invoice(st.session_state.user_id, data)
 
         except Exception as e:
             st.error(f"{file.name}: {str(e)}")
 
+    st.session_state.files_processed = True
     show_toast("Invoice(s) uploaded successfully 🎉")
-    st.rerun()
 
 # -------------------------------------------------
-# Load Invoices (Current User Only)
+# Reset flag when uploader is cleared
+# -------------------------------------------------
+if not uploaded_files:
+    st.session_state.files_processed = False
+
+# -------------------------------------------------
+# Load Invoices
 # -------------------------------------------------
 df_db = get_invoices(st.session_state.user_id)
 
 # -------------------------------------------------
-# Invoice Management (Edit / Delete)
+# Invoice Management
 # -------------------------------------------------
 st.subheader("📊 Uploaded Invoices")
 
@@ -117,7 +125,6 @@ if not df_db.empty:
             for _, row in edited_df.iterrows():
                 update_invoice(row["id"], row.to_dict())
             show_toast("Invoices updated successfully")
-            st.rerun()
 
     with col2:
         invoice_to_delete = st.selectbox(
@@ -134,71 +141,37 @@ else:
     st.info("No invoices uploaded yet.")
 
 # -------------------------------------------------
-# Monthly GST Dashboard (DEFENSIVE & STABLE)
+# Monthly GST Dashboard
 # -------------------------------------------------
 st.subheader("📅 Monthly GST Summary")
 
 df_gst = get_monthly_gst_summary(st.session_state.user_id)
 
 if not df_gst.empty:
-
-    selected_month = st.selectbox(
-        "Select Month",
-        df_gst["month"].tolist()
-    )
-
+    selected_month = st.selectbox("Select Month", df_gst["month"].tolist())
     filtered = df_gst[df_gst["month"] == selected_month]
 
     if not filtered.empty:
-        month_data = filtered.iloc[0]
+        row = filtered.iloc[0]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Taxable Amount", f"₹ {row['taxable_amount']:,}")
+        c2.metric("GST Amount", f"₹ {row['gst_amount']:,}")
+        c3.metric("Total Spend", f"₹ {row['total_amount']:,}")
 
-        col1, col2, col3 = st.columns(3)
-
-        col1.metric("Taxable Amount", f"₹ {month_data['taxable_amount']:,}")
-        col2.metric("GST Amount", f"₹ {month_data['gst_amount']:,}")
-        col3.metric("Total Spend", f"₹ {month_data['total_amount']:,}")
-    else:
-        st.warning("No data available for the selected month.")
-
-    # GST Chart (Always Safe)
-    st.bar_chart(
-        df_gst.set_index("month")[["gst_amount"]],
-        use_container_width=True
-    )
-
-else:
-    st.info("No GST data available yet.")
+    st.bar_chart(df_gst.set_index("month")[["gst_amount"]])
 
 # -------------------------------------------------
-# Multi-Sheet GST Excel Export
+# Excel Export
 # -------------------------------------------------
 if not df_db.empty:
-
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-
-        # Sheet 1: Invoices
         df_db.drop(columns=["id"]).to_excel(
             writer, index=False, sheet_name="Invoices"
         )
-
-        # Sheet 2: Monthly GST Summary
-        df_gst.to_excel(
-            writer, index=False, sheet_name="Monthly_GST_Summary"
-        )
-
-        ws = writer.sheets["Invoices"]
-
-        for idx, col in enumerate(df_db.drop(columns=["id"]).columns, 1):
-            col_letter = get_column_letter(idx)
-            max_len = max(
-                df_db[col].astype(str).map(len).max(),
-                len(col)
-            )
-            ws.column_dimensions[col_letter].width = max_len + 3
+        df_gst.to_excel(writer, index=False, sheet_name="Monthly_GST_Summary")
 
     output.seek(0)
-
     st.download_button(
         "⬇ Download GST Report (Excel)",
         data=output,
