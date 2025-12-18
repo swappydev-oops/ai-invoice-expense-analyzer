@@ -11,90 +11,84 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # ---------------- CSS ----------------
-def load_auth_ui_css():
+def load_css():
     st.markdown("""
     <style>
-    /* FULL BACKGROUND */
-    html, body, .stApp {
-        height: 100%;
-        background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364);
-        background-size: 400% 400%;
-        animation: gradientBG 15s ease infinite;
+    /* Remove Streamlit padding */
+    section.main > div {
+        padding-top: 2rem;
     }
 
-    @keyframes gradientBG {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-
-    /* FLOATING INVOICE CARDS */
-    .invoice {
-        position: fixed;
-        width: 160px;
-        height: 220px;
-        background: rgba(255,255,255,0.08);
-        border-radius: 12px;
-        animation: float 20s linear infinite;
-        z-index: 0;
-    }
-
-    .invoice::before {
-        content: "";
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        height: 8px;
-        background: rgba(255,255,255,0.3);
-        border-radius: 4px;
-    }
-
-    @keyframes float {
-        from { transform: translateY(110vh); }
-        to { transform: translateY(-130vh); }
-    }
-
-    /* CARD */
+    /* Animated card */
     .auth-card {
-        position: relative;
-        z-index: 10;
         max-width: 420px;
         margin: auto;
         margin-top: 10vh;
-        background: white;
         padding: 2.5rem;
-        border-radius: 18px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+        border-radius: 16px;
+        background: linear-gradient(135deg, #ffffff, #f3f6fa);
+        box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+        position: relative;
+        overflow: hidden;
+        animation: fadeIn 0.8s ease-in-out;
     }
 
-    .auth-title {
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Animated invoice lines */
+    .invoice-line {
+        position: absolute;
+        width: 80%;
+        height: 8px;
+        background: linear-gradient(
+            90deg,
+            rgba(200,200,200,0.2),
+            rgba(180,180,180,0.6),
+            rgba(200,200,200,0.2)
+        );
+        border-radius: 6px;
+        animation: scan 3s infinite linear;
+    }
+
+    @keyframes scan {
+        from { left: -80%; }
+        to { left: 120%; }
+    }
+
+    .invoice-line:nth-child(1) { top: 20px; animation-delay: 0s; }
+    .invoice-line:nth-child(2) { top: 45px; animation-delay: 1s; }
+    .invoice-line:nth-child(3) { top: 70px; animation-delay: 2s; }
+
+    .title {
         text-align: center;
-        font-size: 1.9rem;
+        font-size: 1.8rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
     }
 
-    .auth-sub {
+    .subtitle {
         text-align: center;
         color: #6c757d;
         margin-bottom: 2rem;
     }
     </style>
-
-    <div class="invoice" style="left:10%; animation-duration:18s;"></div>
-    <div class="invoice" style="left:30%; animation-duration:22s;"></div>
-    <div class="invoice" style="left:50%; animation-duration:26s;"></div>
-    <div class="invoice" style="left:70%; animation-duration:20s;"></div>
-    <div class="invoice" style="left:85%; animation-duration:24s;"></div>
     """, unsafe_allow_html=True)
 
 # ---------------- LOGIN ----------------
 def login_ui():
+    load_css()
+
     st.markdown("""
     <div class="auth-card">
-        <div class="auth-title">Welcome Back 👋</div>
-        <div class="auth-sub">Login to manage your invoices</div>
+        <div class="invoice-line"></div>
+        <div class="invoice-line"></div>
+        <div class="invoice-line"></div>
+
+        <div class="title">🔐 Login</div>
+        <div class="subtitle">Access your invoice dashboard</div>
     """, unsafe_allow_html=True)
 
     email = st.text_input("Email", key="login_email")
@@ -116,7 +110,7 @@ def login_ui():
             st.session_state.role = user[2]
             st.session_state.plan = user[3]
             st.success("Login successful 🎉")
-            time.sleep(0.5)
+            time.sleep(0.4)
             st.rerun()
         else:
             st.error("Invalid credentials")
@@ -125,22 +119,25 @@ def login_ui():
 
 # ---------------- REGISTER ----------------
 def register_ui():
+    load_css()
+
     st.markdown("""
     <div class="auth-card">
-        <div class="auth-title">Create Account ✨</div>
-        <div class="auth-sub">Start managing invoices smarter</div>
+        <div class="invoice-line"></div>
+        <div class="invoice-line"></div>
+        <div class="invoice-line"></div>
+
+        <div class="title">📝 Register</div>
+        <div class="subtitle">Create your free account</div>
     """, unsafe_allow_html=True)
 
     email = st.text_input("Email", key="reg_email")
     password = st.text_input("Password", type="password", key="reg_pass")
     confirm = st.text_input("Confirm Password", type="password")
 
-    if password != confirm:
-        st.warning("Passwords do not match")
-
     if st.button("Register", use_container_width=True):
         if password != confirm:
-            st.error("Password mismatch")
+            st.error("Passwords do not match")
         else:
             try:
                 conn = get_conn()
@@ -160,17 +157,9 @@ def register_ui():
 # ---------------- AUTH GATE ----------------
 def require_login():
     if "user_id" not in st.session_state:
-        load_auth_ui_css()
-
-        mode = st.radio(
-            "",
-            ["Login", "Register"],
-            horizontal=True
-        )
-
+        mode = st.radio("", ["Login", "Register"], horizontal=True)
         if mode == "Login":
             login_ui()
         else:
             register_ui()
-
         st.stop()
