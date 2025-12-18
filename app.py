@@ -15,6 +15,25 @@ from db.invoice_repo import (
     delete_invoice,
     get_monthly_gst_summary
 )
+#------ Test Duplicate Rows----------
+from db.db import get_connection
+
+conn = get_connection()
+cursor = conn.cursor()
+
+cursor.execute("""
+DELETE FROM invoices
+WHERE id NOT IN (
+    SELECT MIN(id)
+    FROM invoices
+    GROUP BY user_id, invoice_number
+)
+""")
+
+conn.commit()
+conn.close()
+
+#--------------------------------
 
 # -------------------------------------------------
 # Safe Toast Helper (Streamlit version compatible)
