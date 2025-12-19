@@ -2,9 +2,11 @@ import streamlit as st
 import pandas as pd
 import time
 from PIL import Image
+
 from db.db import init_db
 from auth.auth import require_login
 from utils import extract_invoice_details
+
 from db.invoice_repo import (
     insert_invoice,
     invoice_exists,
@@ -15,13 +17,13 @@ from db.invoice_repo import (
     get_vendor_spend,
     get_category_spend
 )
+
 from db.user_repo import (
     get_all_users,
     create_user,
     update_user_role,
     delete_user
 )
-
 
 # -------------------------------------------------
 # Safe Toast Helper
@@ -35,35 +37,35 @@ def show_toast(message):
 # -------------------------------------------------
 # Init
 # -------------------------------------------------
-init_db()
-require_login()
-
 st.set_page_config(
     page_title="AI Invoice & Expense Analyzer",
     layout="wide"
 )
+
+init_db()
+require_login()
 
 # -------------------------------------------------
 # Sidebar
 # -------------------------------------------------
 with st.sidebar:
     st.write(f"👤 {st.session_state.user_email}")
+
+    if st.button("🛠 Admin Panel"):
+        st.session_state.page = "admin"
+
     if st.button("Logout"):
         st.session_state.clear()
         show_toast("Logout successful 👋")
         time.sleep(0.3)
         st.rerun()
-        
+
 if "page" not in st.session_state:
     st.session_state.page = "dashboard"
 
-if st.sidebar.button("🛠 Admin Panel"):
-    st.session_state.page = "admin"
-
-# -------------------------------------------------
-# Admin Panel
-# -------------------------------------------------
-
+# =================================================
+# ADMIN PANEL
+# =================================================
 if st.session_state.page == "admin":
     st.title("🛠 Admin Panel – User Management")
 
@@ -74,14 +76,26 @@ if st.session_state.page == "admin":
 
     # -------- CREATE USER --------
     with st.expander("➕ Create New User"):
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        role = st.selectbox("Role", ["admin", "user"])
-        plan = st.selectbox("Plan", ["free", "pro"])
+        col1, col2 = st.columns(2)
+
+        with col1:
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            company_name = st.text_input("Company Name")
+
+        with col2:
+            role = st.selectbox("Role", ["admin", "user"])
+            plan = st.selectbox("Plan", ["free", "pro"])
 
         if st.button("Create User"):
             try:
-                create_user(email, password, role, plan)
+                create_user(
+                    email=email,
+                    password=password,
+                    company_name=company_name,
+                    role=role,
+                    plan=plan
+                )
                 st.success("User created successfully")
                 st.rerun()
             except Exception:
@@ -97,13 +111,14 @@ if st.session_state.page == "admin":
     if not users:
         st.info("No users found")
     else:
-        for user_id, email, role, plan, created_at in users:
-            col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
+        for user_id, email, company_name, role, plan, created_at in users:
+            col1, col2, col3, col4, col5 = st.columns([3, 3, 2, 2, 1])
 
             col1.write(email)
-            col2.write(plan)
+            col2.write(company_name or "-")
+            col3.write(plan)
 
-            new_role = col3.selectbox(
+            new_role = col4.selectbox(
                 "Role",
                 ["admin", "user"],
                 index=0 if role == "admin" else 1,
@@ -113,15 +128,13 @@ if st.session_state.page == "admin":
             if new_role != role:
                 if col4.button("Update", key=f"update_{user_id}"):
                     update_user_role(user_id, new_role)
-                    st.success("Role updated")
+                    show_toast("Role updated")
                     st.rerun()
 
-            if col5.button("Delete", key=f"delete_{user_id}"):
+            if col5.button("❌", key=f"delete_{user_id}"):
                 delete_user(user_id)
-                st.warning("User deleted")
+                show_toast("User deleted")
                 st.rerun()
-
-    st.divider()
 
     if st.button("⬅ Back to Dashboard"):
         st.session_state.page = "dashboard"
@@ -129,7 +142,9 @@ if st.session_state.page == "admin":
 
     st.stop()
 
-
+# =================================================
+# DASHBOARD
+# =================================================
 st.title("📊 AI Invoice & Expense Dashboard")
 
 # -------------------------------------------------
@@ -148,7 +163,6 @@ uploaded_files = st.file_uploader(
 # Upload + Duplicate Validation
 # -------------------------------------------------
 if uploaded_files and not st.session_state.files_processed:
-
     added, skipped = 0, 0
 
     for file in uploaded_files:
@@ -195,7 +209,6 @@ df_invoices = get_invoices(st.session_state.user_id)
 st.subheader("🧾 Invoices")
 
 if not df_invoices.empty:
-
     edited_df = st.data_editor(
         df_invoices,
         use_container_width=True,
@@ -220,14 +233,13 @@ else:
     st.info("No invoices uploaded yet.")
 
 # -------------------------------------------------
-# GST VALIDATION (FIXED & SAFE)
+# GST VALIDATION
 # -------------------------------------------------
 st.subheader("⚠ GST Validation Flags")
 
 if not df_invoices.empty:
     gst_df = df_invoices.copy()
 
-    # ---- FORCE NUMERIC CONVERSION (CRITICAL FIX) ----
     for col in ["subtotal", "gst_percent", "tax"]:
         gst_df[col] = (
             gst_df[col]
