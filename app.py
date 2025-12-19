@@ -6,6 +6,7 @@ from PIL import Image
 from db.db import init_db
 from auth.auth import require_login
 from utils import extract_invoice_details
+from db.company_repo import get_all_companies
 
 from db.invoice_repo import (
     insert_invoice,
