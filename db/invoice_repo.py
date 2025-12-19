@@ -1,11 +1,11 @@
 import pandas as pd
-from db.db import get_connection
+from db.db import get_conn
 
 # -------------------------------------------------
 # DUPLICATE CHECK
 # -------------------------------------------------
 def invoice_exists(user_id, invoice_number):
-    conn = get_connection()
+    conn = get_conn()
     cursor = conn.cursor()
     cursor.execute(
         "SELECT 1 FROM invoices WHERE user_id = ? AND invoice_number = ?",
@@ -19,7 +19,7 @@ def invoice_exists(user_id, invoice_number):
 # INSERT
 # -------------------------------------------------
 def insert_invoice(user_id, data: dict):
-    conn = get_connection()
+    conn = get_conn()
     cursor = conn.cursor()
     cursor.execute(
         """
@@ -49,7 +49,7 @@ def insert_invoice(user_id, data: dict):
 # READ
 # -------------------------------------------------
 def get_invoices(user_id):
-    conn = get_connection()
+    conn = get_conn()
     df = pd.read_sql(
         """
         SELECT
@@ -76,7 +76,7 @@ def get_invoices(user_id):
 # UPDATE
 # -------------------------------------------------
 def update_invoice(invoice_id, row: dict):
-    conn = get_connection()
+    conn = get_conn()
     cursor = conn.cursor()
     cursor.execute(
         """
@@ -108,7 +108,7 @@ def update_invoice(invoice_id, row: dict):
 # DELETE
 # -------------------------------------------------
 def delete_invoice(invoice_id):
-    conn = get_connection()
+    conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM invoices WHERE id = ?", (invoice_id,))
     conn.commit()
@@ -118,7 +118,7 @@ def delete_invoice(invoice_id):
 # MONTHLY GST SUMMARY
 # -------------------------------------------------
 def get_monthly_gst_summary(user_id):
-    conn = get_connection()
+    conn = get_conn()
     df = pd.read_sql(
         """
         SELECT
@@ -141,7 +141,7 @@ def get_monthly_gst_summary(user_id):
 # VENDOR-WISE SPEND
 # -------------------------------------------------
 def get_vendor_spend(user_id):
-    conn = get_connection()
+    conn = get_conn()
     df = pd.read_sql(
         """
         SELECT
@@ -162,7 +162,7 @@ def get_vendor_spend(user_id):
 # CATEGORY ANALYTICS
 # -------------------------------------------------
 def get_category_spend(user_id):
-    conn = get_connection()
+    conn = get_conn()
     df = pd.read_sql(
         """
         SELECT
