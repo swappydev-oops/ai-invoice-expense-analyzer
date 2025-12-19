@@ -9,17 +9,49 @@ def get_conn():
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
+# ---------- INTERNAL: ENSURE COLUMNS ----------
+def _ensure_user_columns():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("PRAGMA table_info(users)")
+    cols = [c[1] for c in cur.fetchall()]
+
+    if "plan" not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'")
+
+    if "created_at" not in cols:
+        cur.execute(
+            "ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        )
+
+    conn.commit()
+    conn.close()
+
 # ---------- READ ----------
 def get_all_users():
+    _ensure_user_columns()
+
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, email, role, plan, created_at FROM users ORDER BY created_at DESC"
+        """
+        SELECT
+            id,
+            email,
+            role,
+            COALESCE(plan, 'free') AS plan,
+            COALESCE(created_at, '') AS created_at
+        FROM users
+        ORDER BY id DESC
+        """
     ).fetchall()
     conn.close()
     return rows
 
 # ---------- CREATE ----------
 def create_user(email, password, role, plan="free"):
+    _ensure_user_columns()
+
     conn = get_conn()
     conn.execute(
         """
