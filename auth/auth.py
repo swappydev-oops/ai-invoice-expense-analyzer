@@ -23,7 +23,7 @@ def login_ui():
             FROM users
             WHERE email = ? AND password_hash = ?
             """,
-            (email, hash_password(password)),
+            (email, hash_password(password))
         )
 
         user = cur.fetchone()
@@ -37,7 +37,6 @@ def login_ui():
             st.error("User is disabled. Contact admin.")
             return
 
-        # ---- SESSION ----
         st.session_state.user_id = user[0]
         st.session_state.user_email = user[1]
         st.session_state.company_id = user[2]

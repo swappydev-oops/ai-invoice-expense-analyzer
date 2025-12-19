@@ -100,96 +100,62 @@ if "page" not in st.session_state:
 if st.session_state.page == "admin":
     st.title("🛠 Admin Panel – User Management")
 
-    st.info(
-        "Admin Panel is currently open to all users. "
-        "Role-based access will be enforced later."
-    )
-
-    # ---------------- CREATE USER ----------------
     with st.expander("➕ Create New User"):
-        col1, col2 = st.columns(2)
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
 
-        with col1:
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            company_name = st.text_input("Company Name")
+        companies = get_all_companies()
+        if not companies:
+            st.warning("No companies available")
+            st.stop()
 
-        with col2:
-            role = st.selectbox("Role", ["admin", "user"])
-            plan = st.selectbox("Plan", ["free", "pro"])
+        company_map = {name: cid for cid, name in companies}
+        company_name = st.selectbox("Company", list(company_map.keys()))
+        company_id = company_map[company_name]
+
+        role = st.selectbox("Role", ["admin", "user"])
+        plan = st.selectbox("Plan", ["free", "pro"])
 
         if st.button("Create User"):
-            try:
-                create_user(
-                    email=email,
-                    password=password,
-                    company_name=company_name,
-                    role=role,
-                    plan=plan
-                )
-                st.success("User created successfully")
-                st.rerun()
-            except Exception:
-                st.error("User already exists or invalid input")
+            create_user(email, password, company_id, role, plan)
+            toast("User created")
+            st.rerun()
 
     st.divider()
-
-    # ---------------- USER TABLE ----------------
     st.subheader("👥 Users")
 
     users = get_all_users()
 
-    if not users:
-        st.info("No users found")
-    else:
-        # ----- TABLE HEADER -----
-        header_cols = st.columns([3, 3, 2, 2, 2])
-        header_cols[0].markdown("**Email**")
-        header_cols[1].markdown("**Company**")
-        header_cols[2].markdown("**Plan**")
-        header_cols[3].markdown("**Role**")
-        header_cols[4].markdown("**Actions**")
+    header = st.columns([3, 3, 2, 2, 2])
+    header[0].markdown("**Email**")
+    header[1].markdown("**Company**")
+    header[2].markdown("**Plan**")
+    header[3].markdown("**Role**")
+    header[4].markdown("**Action**")
 
-        st.divider()
+    for user_id, email, company, role, plan, is_active, created_at in users:
+        cols = st.columns([3, 3, 2, 2, 2])
+        cols[0].write(email)
+        cols[1].write(company)
+        cols[2].write(plan)
 
-        # ----- TABLE ROWS -----
-        for user_id, email, company_name, role, plan, is_active, created_at in users:
-            row_cols = st.columns([3, 3, 2, 2, 2])
+        new_role = cols[3].selectbox(
+            "Role",
+            ["admin", "user"],
+            index=0 if role == "admin" else 1,
+            key=f"role_{user_id}",
+            label_visibility="collapsed"
+        )
 
-            row_cols[0].write(email)
-            row_cols[1].write(company_name or "-")
-            row_cols[2].write(plan)
+        if cols[4].button("💾 Update", key=f"upd_{user_id}"):
+            update_user_role(user_id, new_role)
+            toast("Role updated")
+            st.rerun()
 
-            new_role = row_cols[3].selectbox(
-                "",
-                ["admin", "user"],
-                index=0 if role == "admin" else 1,
-                key=f"role_{user_id}"
-            )
-
-            action_col = row_cols[4]
-            update_clicked = action_col.button(
-                "💾 Update",
-                key=f"update_{user_id}"
-            )
-            delete_clicked = action_col.button(
-                "❌ Delete",
-                key=f"delete_{user_id}"
-            )
-
-            if update_clicked and new_role != role:
-                update_user_role(user_id, new_role)
-                show_toast("Role updated")
-                st.rerun()
-
-            if delete_clicked:
-                delete_user(user_id)
-                show_toast("User deleted")
-                st.rerun()
-
-    if st.button("⬅ Back to Dashboard"):
-        st.session_state.page = "dashboard"
-        st.rerun()
+        if cols[4].button("❌ Delete", key=f"del_{user_id}"):
+            delete_user(user_id)
+            toast("User deleted")
+            st.rerun()
 
     st.stop()
 

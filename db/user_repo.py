@@ -72,16 +72,24 @@ def get_all_users():
 # -------------------------------------------------
 # CREATE USER
 # -------------------------------------------------
-def create_user(email, password, role, company_name="", plan="free"):
-    ensure_users_schema()
-
+def create_user(email, password, company_id, role, plan):
     conn = get_conn()
-    conn.execute(
+    cur = conn.cursor()
+
+    cur.execute(
         """
-        INSERT INTO users (email, password_hash, company_name, role, plan)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (
+            email, password_hash, company_id, role, plan, is_active
+        )
+        VALUES (?, ?, ?, ?, ?, 1)
         """,
-        (email, hash_password(password), company_name, role, plan),
+        (
+            email,
+            hash_password(password),
+            company_id,
+            role,
+            plan
+        )
     )
     conn.commit()
     conn.close()
@@ -90,12 +98,12 @@ def create_user(email, password, role, company_name="", plan="free"):
 # UPDATE ROLE
 # -------------------------------------------------
 def update_user_role(user_id, role):
-    ensure_users_schema()
-
     conn = get_conn()
-    conn.execute(
+    cur = conn.cursor()
+
+    cur.execute(
         "UPDATE users SET role=? WHERE id=?",
-        (role, user_id),
+        (role, user_id)
     )
     conn.commit()
     conn.close()
@@ -104,9 +112,9 @@ def update_user_role(user_id, role):
 # DELETE USER
 # -------------------------------------------------
 def delete_user(user_id):
-    ensure_users_schema()
-
     conn = get_conn()
-    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM users WHERE id=?", (user_id,))
     conn.commit()
     conn.close()
