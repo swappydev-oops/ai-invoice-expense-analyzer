@@ -74,7 +74,7 @@ if st.session_state.page == "admin":
         "Role-based access will be enforced later."
     )
 
-    # -------- CREATE USER --------
+    # ---------------- CREATE USER ----------------
     with st.expander("➕ Create New User"):
         col1, col2 = st.columns(2)
 
@@ -103,7 +103,7 @@ if st.session_state.page == "admin":
 
     st.divider()
 
-    # -------- USER TABLE --------
+    # ---------------- USER TABLE ----------------
     st.subheader("👥 Users")
 
     users = get_all_users()
@@ -111,27 +111,47 @@ if st.session_state.page == "admin":
     if not users:
         st.info("No users found")
     else:
+        # ----- TABLE HEADER -----
+        header_cols = st.columns([3, 3, 2, 2, 2])
+        header_cols[0].markdown("**Email**")
+        header_cols[1].markdown("**Company**")
+        header_cols[2].markdown("**Plan**")
+        header_cols[3].markdown("**Role**")
+        header_cols[4].markdown("**Actions**")
+
+        st.divider()
+
+        # ----- TABLE ROWS -----
         for user_id, email, company_name, role, plan, created_at in users:
-            col1, col2, col3, col4, col5 = st.columns([3, 3, 2, 2, 1])
+            row_cols = st.columns([3, 3, 2, 2, 2])
 
-            col1.write(email)
-            col2.write(company_name or "-")
-            col3.write(plan)
+            row_cols[0].write(email)
+            row_cols[1].write(company_name or "-")
+            row_cols[2].write(plan)
 
-            new_role = col4.selectbox(
-                "Role",
+            new_role = row_cols[3].selectbox(
+                "",
                 ["admin", "user"],
                 index=0 if role == "admin" else 1,
                 key=f"role_{user_id}"
             )
 
-            if new_role != role:
-                if col4.button("Update", key=f"update_{user_id}"):
-                    update_user_role(user_id, new_role)
-                    show_toast("Role updated")
-                    st.rerun()
+            action_col = row_cols[4]
+            update_clicked = action_col.button(
+                "💾 Update",
+                key=f"update_{user_id}"
+            )
+            delete_clicked = action_col.button(
+                "❌ Delete",
+                key=f"delete_{user_id}"
+            )
 
-            if col5.button("❌", key=f"delete_{user_id}"):
+            if update_clicked and new_role != role:
+                update_user_role(user_id, new_role)
+                show_toast("Role updated")
+                st.rerun()
+
+            if delete_clicked:
                 delete_user(user_id)
                 show_toast("User deleted")
                 st.rerun()
