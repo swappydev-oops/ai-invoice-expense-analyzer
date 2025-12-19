@@ -24,8 +24,6 @@ from db.user_repo import (
     update_user_role,
     delete_user
 )
-import streamlit as st
-st.session_state.clear()
 
 # -------------------------------------------------
 # Safe Toast Helper
@@ -76,13 +74,18 @@ if st.session_state.page == "admin":
         "Role-based access will be enforced later."
     )
 
-    # -------- CREATE USER --------
+    # ---------------- CREATE USER ----------------
     with st.expander("➕ Create New User"):
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        company_name = st.text_input("Company Name")
-        role = st.selectbox("Role", ["admin", "user"])
-        plan = st.selectbox("Plan", ["free", "pro"])
+        col1, col2 = st.columns(2)
+
+        with col1:
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            company_name = st.text_input("Company Name")
+
+        with col2:
+            role = st.selectbox("Role", ["admin", "user"])
+            plan = st.selectbox("Plan", ["free", "pro"])
 
         if st.button("Create User"):
             try:
@@ -100,65 +103,64 @@ if st.session_state.page == "admin":
 
     st.divider()
 
-    # -------- USER TABLE --------
+    # ---------------- USER TABLE ----------------
     st.subheader("👥 Users")
 
     users = get_all_users()
 
     if not users:
         st.info("No users found")
-        st.stop()
+    else:
+        # ----- TABLE HEADER -----
+        header_cols = st.columns([3, 3, 2, 2, 2])
+        header_cols[0].markdown("**Email**")
+        header_cols[1].markdown("**Company**")
+        header_cols[2].markdown("**Plan**")
+        header_cols[3].markdown("**Role**")
+        header_cols[4].markdown("**Actions**")
 
-    df_users = pd.DataFrame(
-        users,
-        columns=["id", "email", "company_name", "role", "plan", "created_at"]
-    )
+        st.divider()
 
-    st.dataframe(
-        df_users.drop(columns=["id"]),
-        use_container_width=True
-    )
+        # ----- TABLE ROWS -----
+        for user_id, email, company_name, role, plan, created_at in users:
+            row_cols = st.columns([3, 3, 2, 2, 2])
 
-    st.divider()
+            row_cols[0].write(email)
+            row_cols[1].write(company_name or "-")
+            row_cols[2].write(plan)
 
-    # -------- EDIT USER --------
-    st.subheader("✏ Edit User")
+            new_role = row_cols[3].selectbox(
+                "",
+                ["admin", "user"],
+                index=0 if role == "admin" else 1,
+                key=f"role_{user_id}"
+            )
 
-    user_id = st.selectbox(
-        "Select User",
-        df_users["id"],
-        format_func=lambda x: df_users[df_users["id"] == x]["email"].values[0]
-    )
+            action_col = row_cols[4]
+            update_clicked = action_col.button(
+                "💾 Update",
+                key=f"update_{user_id}"
+            )
+            delete_clicked = action_col.button(
+                "❌ Delete",
+                key=f"delete_{user_id}"
+            )
 
-    selected_user = df_users[df_users["id"] == user_id].iloc[0]
+            if update_clicked and new_role != role:
+                update_user_role(user_id, new_role)
+                show_toast("Role updated")
+                st.rerun()
 
-    new_role = st.selectbox(
-        "Role",
-        ["admin", "user"],
-        index=0 if selected_user["role"] == "admin" else 1
-    )
-
-    if st.button("Update Role"):
-        update_user_role(user_id, new_role)
-        st.success("Role updated")
-        st.rerun()
-
-    st.divider()
-
-    # -------- DELETE USER --------
-    st.subheader("❌ Delete User")
-
-    if st.button("Delete Selected User"):
-        delete_user(user_id)
-        st.warning("User deleted")
-        st.rerun()
+            if delete_clicked:
+                delete_user(user_id)
+                show_toast("User deleted")
+                st.rerun()
 
     if st.button("⬅ Back to Dashboard"):
         st.session_state.page = "dashboard"
         st.rerun()
 
     st.stop()
-
 
 # =================================================
 # DASHBOARD
