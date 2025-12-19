@@ -1,10 +1,12 @@
 import sqlite3
 from pathlib import Path
 
+# Use a Streamlit-safe writable directory
 DB_PATH = Path("data/app.db")
 
 def get_connection():
-    DB_PATH.parent.mkdir(exist_ok=True)
+    # Ensure parent directory exists
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def init_db():
