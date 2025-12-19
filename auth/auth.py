@@ -28,7 +28,7 @@ def hash_password(password: str) -> str:
 # Database Operations
 # -------------------------------------------------
 def get_user_by_email(email):
-    conn = get_connection()
+    conn = get_conn()
     cursor = conn.cursor()
     cursor.execute(
         "SELECT id, password_hash FROM users WHERE email = ?",
@@ -39,7 +39,7 @@ def get_user_by_email(email):
     return user
 
 def create_user(email, password, company_name):
-    conn = get_connection()
+    conn = get_conn()
     cursor = conn.cursor()
     cursor.execute(
         """
