@@ -1,12 +1,25 @@
 import sqlite3
-from db.config import DB_PATH
+from pathlib import Path
 
-def get_conn():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+DB_PATH = Path("data/app.db")
 
-def init_db():
-    conn = get_conn()
+
+def column_exists(conn, table, column):
+    cur = conn.cursor()
+    cur.execute(f"PRAGMA table_info({table})")
+    return column in [row[1] for row in cur.fetchall()]
+
+
+def table_exists(conn, table):
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table,)
+    )
+    return cur.fetchone() is not None
+
+
+def migrate_company_schema(conn):
     cur = conn.cursor()
 
     cur.execute("""
@@ -36,7 +49,7 @@ def init_db():
         )
     """)
 
-    # 1. Create companies table
+    # ---- CREATE COMPANIES TABLE (SAFE) ----
     cur.execute("""
     CREATE TABLE IF NOT EXISTS companies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +61,12 @@ def init_db():
     )
     """)
 
-    # 2. Insert companies from existing users
+    # ---- CHECK IF OLD COLUMN EXISTS ----
+    if not column_exists(conn, "users", "company_name"):
+        # Migration already applied → do nothing
+        return
+
+    # ---- INSERT COMPANIES FROM USERS ----
     cur.execute("""
     INSERT OR IGNORE INTO companies (name)
     SELECT DISTINCT company_name
@@ -57,9 +75,9 @@ def init_db():
       AND company_name != ''
     """)
 
-    # 3. Create new users table
+    # ---- CREATE NEW USERS TABLE ----
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS users_new (
+    CREATE TABLE users_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
@@ -72,7 +90,7 @@ def init_db():
     )
     """)
 
-    # 4. Migrate users
+    # ---- MIGRATE USERS ----
     cur.execute("""
     INSERT INTO users_new (
         id, email, password_hash, company_id, role, plan, created_at
@@ -90,9 +108,15 @@ def init_db():
       ON u.company_name = c.name
     """)
 
-    # 5. Replace old users table
+    # ---- SWAP TABLES ----
     cur.execute("DROP TABLE users")
     cur.execute("ALTER TABLE users_new RENAME TO users")
 
     conn.commit()
+
+
+def init_db():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    migrate_company_schema(conn)
     conn.close()
