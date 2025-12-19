@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import time
 from PIL import Image
-
 from db.db import init_db
 from auth.auth import require_login
 from utils import extract_invoice_details
