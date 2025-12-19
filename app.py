@@ -16,6 +16,13 @@ from db.invoice_repo import (
     get_vendor_spend,
     get_category_spend
 )
+from db.user_repo import (
+    get_all_users,
+    create_user,
+    update_user_role,
+    delete_user
+)
+
 
 # -------------------------------------------------
 # Safe Toast Helper
@@ -47,6 +54,82 @@ with st.sidebar:
         show_toast("Logout successful 👋")
         time.sleep(0.3)
         st.rerun()
+        
+if "page" not in st.session_state:
+    st.session_state.page = "dashboard"
+
+if st.sidebar.button("🛠 Admin Panel"):
+    st.session_state.page = "admin"
+
+# -------------------------------------------------
+# Admin Panel
+# -------------------------------------------------
+
+if st.session_state.page == "admin":
+    st.title("🛠 Admin Panel – User Management")
+
+    st.info(
+        "Admin Panel is currently open to all users. "
+        "Role-based access will be enforced later."
+    )
+
+    # -------- CREATE USER --------
+    with st.expander("➕ Create New User"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        role = st.selectbox("Role", ["admin", "user"])
+        plan = st.selectbox("Plan", ["free", "pro"])
+
+        if st.button("Create User"):
+            try:
+                create_user(email, password, role, plan)
+                st.success("User created successfully")
+                st.rerun()
+            except Exception:
+                st.error("User already exists or invalid input")
+
+    st.divider()
+
+    # -------- USER TABLE --------
+    st.subheader("👥 Users")
+
+    users = get_all_users()
+
+    if not users:
+        st.info("No users found")
+    else:
+        for user_id, email, role, plan, created_at in users:
+            col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
+
+            col1.write(email)
+            col2.write(plan)
+
+            new_role = col3.selectbox(
+                "Role",
+                ["admin", "user"],
+                index=0 if role == "admin" else 1,
+                key=f"role_{user_id}"
+            )
+
+            if new_role != role:
+                if col4.button("Update", key=f"update_{user_id}"):
+                    update_user_role(user_id, new_role)
+                    st.success("Role updated")
+                    st.rerun()
+
+            if col5.button("Delete", key=f"delete_{user_id}"):
+                delete_user(user_id)
+                st.warning("User deleted")
+                st.rerun()
+
+    st.divider()
+
+    if st.button("⬅ Back to Dashboard"):
+        st.session_state.page = "dashboard"
+        st.rerun()
+
+    st.stop()
+
 
 st.title("📊 AI Invoice & Expense Dashboard")
 
