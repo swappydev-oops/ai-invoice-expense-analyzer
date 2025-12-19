@@ -30,9 +30,29 @@ from db.user_repo import (
 # ---------------------------------------
 
 import sqlite3
-conn = sqlite3.connect("data/app.db")
-print(conn.execute("PRAGMA table_info(users)").fetchall())
-conn.close()
+from pathlib import Path
+
+DB_PATH = Path("data/app.db")
+
+st.subheader("🔍 SQLite Schema Debug")
+
+if DB_PATH.exists():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    st.write("Tables:", cur.fetchall())
+
+    cur.execute("PRAGMA table_info(users)")
+    st.write("Users table:", cur.fetchall())
+
+    cur.execute("PRAGMA table_info(companies)")
+    st.write("Companies table:", cur.fetchall())
+
+    conn.close()
+else:
+    st.error("DB file does not exist")
+
 
 # -------------------------------------------------
 # Safe Toast Helper
