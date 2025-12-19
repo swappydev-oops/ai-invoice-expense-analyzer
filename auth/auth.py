@@ -1,7 +1,7 @@
 import streamlit as st
 import hashlib
 import time
-from db.db import get_connection
+from db.db import get_conn
 
 # -------------------------------------------------
 # Toast Compatibility Helper (NO st.toast usage)
