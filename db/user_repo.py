@@ -46,22 +46,25 @@ def ensure_users_schema():
 # READ USERS
 # -------------------------------------------------
 def get_all_users():
-    ensure_users_schema()
-
     conn = get_conn()
-    rows = conn.execute(
+    cur = conn.cursor()
+
+    cur.execute(
         """
         SELECT
-            id,
-            email,
-            COALESCE(company_name, '') AS company_name,
-            COALESCE(role, 'user') AS role,
-            COALESCE(plan, 'free') AS plan,
-            created_at
-        FROM users
-        ORDER BY id DESC
+            u.id,
+            u.email,
+            c.name AS company_name,
+            u.role,
+            u.plan,
+            u.is_active,
+            u.created_at
+        FROM users u
+        JOIN companies c ON u.company_id = c.id
+        ORDER BY u.created_at DESC
         """
-    ).fetchall()
+    )
+    rows = cur.fetchall()
     conn.close()
     return rows
 
