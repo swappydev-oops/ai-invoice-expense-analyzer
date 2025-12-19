@@ -54,16 +54,17 @@ def get_all_users():
         SELECT
             u.id,
             u.email,
-            c.name AS company_name,
+            COALESCE(c.name, 'Unassigned') AS company_name,
             u.role,
             u.plan,
             u.is_active,
             u.created_at
         FROM users u
-        JOIN companies c ON u.company_id = c.id
+        LEFT JOIN companies c ON u.company_id = c.id
         ORDER BY u.created_at DESC
         """
     )
+
     rows = cur.fetchall()
     conn.close()
     return rows
