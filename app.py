@@ -7,9 +7,9 @@ from db.db import init_db
 from auth.auth import require_login
 from auth.roles import can_edit
 from utils import extract_invoice_details
-from utils.excel_export import export_full_excel
-from utils.excel_import import import_excel_and_sync
-from utils.gst_report import generate_gst_report
+from helpers.excel_export import export_full_excel
+from helpers.excel_import import import_excel_and_sync
+from helpers.gst_report import generate_gst_report
 from db.invoice_repo import (
     insert_invoice,
     invoice_exists,
