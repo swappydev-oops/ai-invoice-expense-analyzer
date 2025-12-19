@@ -25,6 +25,15 @@ from db.user_repo import (
     delete_user
 )
 
+#----------------------------------------
+#  Temp Code
+# ---------------------------------------
+
+import sqlite3
+conn = sqlite3.connect("data/app.db")
+print(conn.execute("PRAGMA table_info(users)").fetchall())
+conn.close()
+
 # -------------------------------------------------
 # Safe Toast Helper
 # -------------------------------------------------
