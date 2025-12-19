@@ -55,3 +55,58 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     new_value TEXT,
     edited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Company Table
+CREATE TABLE IF NOT EXISTS companies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    gst_number TEXT,
+    plan TEXT DEFAULT 'free',
+    is_active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Migrate users into new table
+INSERT INTO companies (name)
+SELECT DISTINCT company_name
+FROM users
+WHERE company_name IS NOT NULL
+  AND company_name != '';
+
+  -- Temporary User Table
+  CREATE TABLE users_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    company_id INTEGER NOT NULL,
+    role TEXT DEFAULT 'user',
+    is_active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (company_id) REFERENCES companies(id)
+);
+
+INSERT INTO users_new (
+    id,
+    email,
+    password_hash,
+    company_id,
+    created_at
+)
+SELECT
+    u.id,
+    u.email,
+    u.password_hash,
+    c.id AS company_id,
+    u.created_at
+FROM users u
+JOIN companies c
+  ON u.company_name = c.name;
+
+  -- Test purpose
+
+DROP TABLE users;
+ALTER TABLE users_new RENAME TO users;
+
+-- Create Index
+CREATE INDEX idx_users_company_id ON users(company_id);
+
