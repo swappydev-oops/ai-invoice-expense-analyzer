@@ -9,7 +9,42 @@ def get_connection():
 
 def init_db():
     conn = get_connection()
-    with open("db/schema.sql", "r") as f:
-        conn.executescript(f.read())
+    cur = conn.cursor()
+
+    # ---------------- USERS ----------------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            plan TEXT DEFAULT 'free',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Safe migration: add plan column if missing
+    cur.execute("PRAGMA table_info(users)")
+    cols = [c[1] for c in cur.fetchall()]
+    if "plan" not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'")
+
+    # ---------------- INVOICES ----------------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS invoices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            invoice_number TEXT NOT NULL,
+            vendor TEXT,
+            invoice_date TEXT,
+            subtotal REAL,
+            tax REAL,
+            total_amount REAL,
+            category TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, invoice_number)
+        )
+    """)
+
     conn.commit()
     conn.close()
