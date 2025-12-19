@@ -3,6 +3,12 @@ from pathlib import Path
 
 DB_PATH = Path("data/app.db")
 
+def get_conn():
+    """
+    Centralized DB connection helper
+    """
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    return sqlite3.connect(DB_PATH)
 
 def column_exists(conn, table, column):
     cur = conn.cursor()
