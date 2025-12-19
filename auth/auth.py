@@ -1,109 +1,95 @@
 import streamlit as st
 import sqlite3
 import hashlib
-import time
 
-# ---------------- DB ----------------
+DB_PATH = "db/database.db"
+
 def get_conn():
-    return sqlite3.connect("data.db", check_same_thread=False)
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
 
-def hash_password(password):
+def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
-# ---------------- UI Helpers ----------------
-def centered_container(width=3):
-    left, center, right = st.columns([1, width, 1])
-    return center
-
 # ---------------- LOGIN UI ----------------
+
 def login_ui():
-    with centered_container():
-        st.markdown("## 🔐 Login")
-        st.caption("Access your invoice dashboard")
+    st.subheader("🔐 Login")
 
-        email = st.text_input("📧 Email", placeholder="you@company.com")
-        password = st.text_input("🔑 Password", type="password")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
 
-        if st.button("Login", use_container_width=True):
-            with st.spinner("Authenticating..."):
-                time.sleep(0.5)
-                conn = get_conn()
-                cur = conn.cursor()
-                cur.execute(
-                    "SELECT id,email,role,plan FROM users WHERE email=? AND password=?",
-                    (email, hash_password(password))
-                )
-                user = cur.fetchone()
-                conn.close()
+    if st.button("Login"):
+        conn = get_conn()
+        cur = conn.cursor()
 
-            if user:
-                st.session_state.user_id = user[0]
-                st.session_state.user_email = user[1]
-                st.session_state.role = user[2]
-                st.session_state.plan = user[3]
-                st.toast("Login successful 🎉")
-                time.sleep(0.3)
-                st.rerun()
-            else:
-                st.error("Invalid email or password")
+        cur.execute(
+            """
+            SELECT id, email, role, plan
+            FROM users
+            WHERE email=? AND password_hash=?
+            """,
+            (email, hash_password(password)),
+        )
+
+        row = cur.fetchone()
+        conn.close()
+
+        if row:
+            user_id, email, role, plan = row
+            st.session_state.logged_in = True
+            st.session_state.user_id = user_id
+            st.session_state.user_email = email
+            st.session_state.role = role
+            st.session_state.plan = plan or "free"
+
+            st.success("Login successful")
+            st.rerun()
+        else:
+            st.error("Invalid email or password")
 
 # ---------------- REGISTER UI ----------------
+
 def register_ui():
-    with centered_container():
-        st.markdown("## 📝 Create Account")
-        st.caption("Start managing invoices smarter")
+    st.subheader("📝 Register")
 
-        email = st.text_input("📧 Email", placeholder="you@company.com")
-        password = st.text_input("🔑 Password", type="password")
-        confirm = st.text_input("🔁 Confirm Password", type="password")
+    email = st.text_input("Email", key="reg_email")
+    password = st.text_input("Password", type="password", key="reg_password")
 
-        if password and confirm and password != confirm:
-            st.warning("Passwords do not match")
+    if st.button("Register"):
+        conn = get_conn()
+        cur = conn.cursor()
 
-        if st.button("Register", use_container_width=True):
-            if password != confirm:
-                st.error("Passwords do not match")
-                return
+        # First user becomes admin
+        cur.execute("SELECT COUNT(*) FROM users")
+        user_count = cur.fetchone()[0]
+        role = "admin" if user_count == 0 else "user"
 
-            with st.spinner("Creating account..."):
-                time.sleep(0.5)
-                try:
-                    conn = get_conn()
-                    cur = conn.cursor()
-                    cur.execute(
-                        "INSERT INTO users(email,password,role,plan) VALUES(?,?,?,?)",
-                        (email, hash_password(password), "user", "free")
-                    )
-                    conn.commit()
-                    conn.close()
-                    st.success("Account created successfully 🎉")
-                except sqlite3.IntegrityError:
-                    st.error("Email already exists")
+        try:
+            cur.execute(
+                """
+                INSERT INTO users (email, password_hash, role, plan)
+                VALUES (?, ?, ?, ?)
+                """,
+                (email, hash_password(password), role, "free"),
+            )
+            conn.commit()
+            st.success("Registration successful. Please login.")
+            st.rerun()
+        except sqlite3.IntegrityError:
+            st.error("User already exists")
+        finally:
+            conn.close()
 
 # ---------------- AUTH GATE ----------------
+
 def require_login():
-    if "user_id" not in st.session_state:
-        st.markdown(
-            """
-            <style>
-            .block-container {
-                padding-top: 6rem;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
 
-        mode = st.radio(
-            "",
-            ["Login", "Register"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-
-        if mode == "Login":
+    if not st.session_state.logged_in:
+        tab1, tab2 = st.tabs(["Login", "Register"])
+        with tab1:
             login_ui()
-        else:
+        with tab2:
             register_ui()
-
         st.stop()
