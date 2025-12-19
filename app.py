@@ -25,6 +25,9 @@ from db.user_repo import (
     delete_user
 )
 
+
+init_db()
+
 #----------------------------------------
 #  Temp Code
 # ---------------------------------------
@@ -71,7 +74,6 @@ st.set_page_config(
     layout="wide"
 )
 
-init_db()
 require_login()
 
 # -------------------------------------------------
