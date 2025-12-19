@@ -88,7 +88,7 @@ with st.sidebar:
 
     if st.button("Logout"):
         st.session_state.clear()
-        show_toast("Logout successful 👋")
+        st.success("Logout successful 👋")
         time.sleep(0.3)
         st.rerun()
 
@@ -119,7 +119,7 @@ if st.session_state.page == "admin":
 
         if st.button("Create User"):
             create_user(email, password, company_id, role, plan)
-            toast("User created")
+            st.success("User created")
             st.rerun()
 
     st.divider()
@@ -150,12 +150,12 @@ if st.session_state.page == "admin":
 
         if cols[4].button("💾 Update", key=f"upd_{user_id}"):
             update_user_role(user_id, new_role)
-            toast("Role updated")
+            st.success("Role updated")
             st.rerun()
 
         if cols[4].button("❌ Delete", key=f"del_{user_id}"):
             delete_user(user_id)
-            toast("User deleted")
+            st.success("User deleted")
             st.rerun()
 
     st.stop()
@@ -209,7 +209,7 @@ if uploaded_files and not st.session_state.files_processed:
     st.session_state.files_processed = True
 
     if added:
-        show_toast(f"{added} invoice(s) uploaded successfully 🎉")
+        st.success(f"{added} invoice(s) uploaded successfully 🎉")
     if skipped:
         st.warning(f"{skipped} duplicate invoice(s) skipped")
 
@@ -239,13 +239,13 @@ if not df_invoices.empty:
         if st.button("💾 Save Changes"):
             for _, row in edited_df.iterrows():
                 update_invoice(row["id"], row.to_dict())
-            show_toast("Invoices updated successfully")
+            st.success("Invoices updated successfully")
 
     with col2:
         del_id = st.selectbox("Delete Invoice", df_invoices["id"])
         if st.button("Delete"):
             delete_invoice(del_id)
-            show_toast("Invoice deleted")
+            st.success("Invoice deleted")
             st.rerun()
 else:
     st.info("No invoices uploaded yet.")
