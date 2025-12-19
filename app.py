@@ -153,7 +153,7 @@ if st.session_state.page == "admin":
         st.divider()
 
         # ----- TABLE ROWS -----
-        for user_id, email, company_name, role, plan, created_at in users:
+        for user_id, email, company_name, role, plan, is_active, created_at in users:
             row_cols = st.columns([3, 3, 2, 2, 2])
 
             row_cols[0].write(email)
