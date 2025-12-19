@@ -81,24 +81,32 @@ require_login()
 # Sidebar
 # -------------------------------------------------
 with st.sidebar:
-    st.write(f"👤 {st.session_state.user_email}")
+    st.markdown(f"👤 **{st.session_state.user_email}**")
 
-    if st.button("🛠 Admin Panel"):
-        st.session_state.page = "admin"
+    st.divider()
 
-    if st.button("Logout"):
+    # 🔽 Admin Section (Expandable)
+    with st.expander("🛠 Admin Panel", expanded=False):
+
+        if st.button("👥 User Details", use_container_width=True):
+            st.session_state.page = "admin_users"
+
+        if st.button("🏢 Company Details", use_container_width=True):
+            st.session_state.page = "admin_companies"
+
+    st.divider()
+
+    if st.button("🚪 Logout", use_container_width=True):
         st.session_state.clear()
-        st.success("Logout successful 👋")
+        toast("Logged out")
         time.sleep(0.3)
         st.rerun()
 
-if "page" not in st.session_state:
-    st.session_state.page = "dashboard"
 
 # =================================================
-# ADMIN PANEL
+# ADMIN – USER DETAILS (EXISTING CRUD PAGE)
 # =================================================
-if st.session_state.page == "admin":
+if st.session_state.page == "admin_users":
     st.title("🛠 Admin Panel – User Management")
 
     with st.expander("➕ Create New User"):
@@ -119,7 +127,7 @@ if st.session_state.page == "admin":
 
         if st.button("Create User"):
             create_user(email, password, company_id, role, plan)
-            st.success("User created")
+            toast("User created")
             st.rerun()
 
     st.divider()
@@ -150,14 +158,23 @@ if st.session_state.page == "admin":
 
         if cols[4].button("💾 Update", key=f"upd_{user_id}"):
             update_user_role(user_id, new_role)
-            st.success("Role updated")
+            toast("Role updated")
             st.rerun()
 
         if cols[4].button("❌ Delete", key=f"del_{user_id}"):
             delete_user(user_id)
-            st.success("User deleted")
+            toast("User deleted")
             st.rerun()
 
+    st.stop()
+
+
+# =================================================
+# ADMIN – COMPANY DETAILS (PLACEHOLDER)
+# =================================================
+if st.session_state.page == "admin_companies":
+    st.title("🏢 Company Details")
+    st.info("Company CRUD will be implemented here next.")
     st.stop()
 
 # =================================================
