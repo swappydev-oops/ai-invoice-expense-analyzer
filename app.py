@@ -3,6 +3,7 @@ from auth.auth import require_login
 from db.company_repo import (get_all_companies, create_company, update_company, toggle_company)
 from db.user_repo import (get_all_users, create_user, update_user_role, toggle_user)
 
+st.write("DATABASE_URL exists:", bool(os.getenv("DATABASE_URL")))
 st.set_page_config("Admin Panel", layout="wide")
 require_login()
 
