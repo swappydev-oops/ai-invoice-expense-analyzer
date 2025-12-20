@@ -33,29 +33,29 @@ init_db()
 #  Temp Code
 # ---------------------------------------
 
-# import sqlite3
-# from pathlib import Path
+import sqlite3
+from pathlib import Path
 
-# DB_PATH = Path("data/app.db")
+DB_PATH = Path("data/app.db")
 
-# st.subheader("🔍 SQLite Schema Debug")
+st.subheader("🔍 SQLite Schema Debug")
 
-# if DB_PATH.exists():
-#     conn = sqlite3.connect(DB_PATH)
-#     cur = conn.cursor()
+if DB_PATH.exists():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
 
-#     cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-#     st.write("Tables:", cur.fetchall())
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    st.write("Tables:", cur.fetchall())
 
-#     cur.execute("PRAGMA table_info(users)")
-#     st.write("Users table:", cur.fetchall())
+    cur.execute("PRAGMA table_info(users)")
+    st.write("Users table:", cur.fetchall())
 
-#     cur.execute("PRAGMA table_info(companies)")
-#     st.write("Companies table:", cur.fetchall())
+    cur.execute("PRAGMA table_info(companies)")
+    st.write("Companies table:", cur.fetchall())
 
-#     conn.close()
-# else:
-#     st.error("DB file does not exist")
+    conn.close()
+else:
+    st.error("DB file does not exist")
 
 
 # -------------------------------------------------
