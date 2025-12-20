@@ -3,3 +3,4 @@ pandas
 pillow
 requests
 openpyxl
+psycopg2-binary
