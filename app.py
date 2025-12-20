@@ -1,7 +1,7 @@
 import streamlit as st
 from auth.auth import require_login
-from db.company_repo import get_all_companies, create_company, update_company, toggle_company
-from db.user_repo import get_all_users, create_user, update_user_role, toggle_user
+from db.company_repo import (get_all_companies, create_company, update_company, toggle_company)
+from db.user_repo import (get_all_users, create_user, update_user_role, toggle_user)
 
 st.set_page_config("Admin Panel", layout="wide")
 require_login()
