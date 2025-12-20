@@ -168,96 +168,96 @@ if st.session_state.page == "admin_users":
 
     st.stop()
 
-# =================================================
-# ADMIN – COMPANY DETAILS
-# =================================================
-if st.session_state.page == "admin_companies":
-    st.title("🏢 Company Management")
+# # =================================================
+# # ADMIN – COMPANY DETAILS
+# # =================================================
+# if st.session_state.page == "admin_companies":
+#     st.title("🏢 Company Management")
 
-    from db.company_repo import (
-        get_all_companies,
-        create_company,
-        update_company,
-        set_company_active
-    )
+#     from db.company_repo import (
+#         get_all_companies,
+#         create_company,
+#         update_company,
+#         set_company_active
+#     )
 
-    # ---------------- CREATE COMPANY ----------------
-    with st.expander("➕ Create New Company"):
-        name = st.text_input("Company Name")
-        gst = st.text_input("GST Number")
-        plan = st.selectbox("Plan", ["free", "pro"])
+#     # ---------------- CREATE COMPANY ----------------
+#     with st.expander("➕ Create New Company"):
+#         name = st.text_input("Company Name")
+#         gst = st.text_input("GST Number")
+#         plan = st.selectbox("Plan", ["free", "pro"])
 
-        if st.button("Create Company"):
-            if not name:
-                st.error("Company name is required")
-            else:
-                create_company(name, gst, plan)
-                toast("Company created")
-                st.rerun()
+#         if st.button("Create Company"):
+#             if not name:
+#                 st.error("Company name is required")
+#             else:
+#                 create_company(name, gst, plan)
+#                 toast("Company created")
+#                 st.rerun()
 
-    st.divider()
-    st.subheader("🏢 Companies")
+#     st.divider()
+#     st.subheader("🏢 Companies")
 
-    companies = get_all_companies()
+#     companies = get_all_companies()
 
-    if not companies:
-        st.info("No companies found")
-        st.stop()
+#     if not companies:
+#         st.info("No companies found")
+#         st.stop()
 
-    # ---- TABLE HEADER ----
-    header = st.columns([3, 2, 2, 2, 2])
-    header[0].markdown("**Name**")
-    header[1].markdown("**GST**")
-    header[2].markdown("**Plan**")
-    header[3].markdown("**Status**")
-    header[4].markdown("**Action**")
+#     # ---- TABLE HEADER ----
+#     header = st.columns([3, 2, 2, 2, 2])
+#     header[0].markdown("**Name**")
+#     header[1].markdown("**GST**")
+#     header[2].markdown("**Plan**")
+#     header[3].markdown("**Status**")
+#     header[4].markdown("**Action**")
 
-    # ---- TABLE ROWS ----
-    for cid, name, gst, plan, is_active, created_at in companies:
-        cols = st.columns([3, 2, 2, 2, 2])
+#     # ---- TABLE ROWS ----
+#     for cid, name, gst, plan, is_active, created_at in companies:
+#         cols = st.columns([3, 2, 2, 2, 2])
 
-        cols[0].write(name)
-        cols[1].write(gst or "-")
-        cols[2].write(plan)
-        cols[3].write("✅ Active" if is_active else "❌ Disabled")
+#         cols[0].write(name)
+#         cols[1].write(gst or "-")
+#         cols[2].write(plan)
+#         cols[3].write("✅ Active" if is_active else "❌ Disabled")
 
-        with cols[4]:
-            if st.button("✏ Edit", key=f"edit_{cid}"):
-                st.session_state.edit_company_id = cid
+#         with cols[4]:
+#             if st.button("✏ Edit", key=f"edit_{cid}"):
+#                 st.session_state.edit_company_id = cid
 
-            toggle_label = "Disable" if is_active else "Enable"
-            if st.button(toggle_label, key=f"toggle_{cid}"):
-                set_company_active(cid, 0 if is_active else 1)
-                toast("Company status updated")
-                st.rerun()
+#             toggle_label = "Disable" if is_active else "Enable"
+#             if st.button(toggle_label, key=f"toggle_{cid}"):
+#                 set_company_active(cid, 0 if is_active else 1)
+#                 toast("Company status updated")
+#                 st.rerun()
 
-    # ---------------- EDIT COMPANY ----------------
-    if "edit_company_id" in st.session_state:
-        cid = st.session_state.edit_company_id
-        company = [c for c in companies if c[0] == cid][0]
+#     # ---------------- EDIT COMPANY ----------------
+#     if "edit_company_id" in st.session_state:
+#         cid = st.session_state.edit_company_id
+#         company = [c for c in companies if c[0] == cid][0]
 
-        st.divider()
-        st.subheader("✏ Edit Company")
+#         st.divider()
+#         st.subheader("✏ Edit Company")
 
-        new_name = st.text_input("Company Name", company[1])
-        new_gst = st.text_input("GST Number", company[2] or "")
-        new_plan = st.selectbox(
-            "Plan",
-            ["free", "pro"],
-            index=0 if company[3] == "free" else 1
-        )
+#         new_name = st.text_input("Company Name", company[1])
+#         new_gst = st.text_input("GST Number", company[2] or "")
+#         new_plan = st.selectbox(
+#             "Plan",
+#             ["free", "pro"],
+#             index=0 if company[3] == "free" else 1
+#         )
 
-        if st.button("Save Changes"):
-            update_company(cid, new_name, new_gst, new_plan)
-            toast("Company updated")
-            del st.session_state.edit_company_id
-            st.rerun()
+#         if st.button("Save Changes"):
+#             update_company(cid, new_name, new_gst, new_plan)
+#             toast("Company updated")
+#             del st.session_state.edit_company_id
+#             st.rerun()
 
-        if st.button("Cancel"):
-            del st.session_state.edit_company_id
-            st.rerun()
+#         if st.button("Cancel"):
+#             del st.session_state.edit_company_id
+#             st.rerun()
 
-    st.stop()
+#     st.stop()
 
 
 # =================================================

@@ -17,24 +17,24 @@ def login_ui():
         conn = get_conn()
         cur = conn.cursor()
 
-        # ---- SAFE LOGIN QUERY (BACKWARD COMPATIBLE) ----
-        cur.execute("""
-            SELECT
-                id,
-                email,
-                COALESCE(company_id, 0),
-                COALESCE(role, 'user'),
-                COALESCE(plan, 'free'),
-                1
+        cur.execute(
+            """
+            SELECT id, email, company_id, role, plan, is_active
             FROM users
             WHERE email = ? AND password_hash = ?
-        """, (email, hash_password(password)))
+            """,
+            (email, hash_password(password))
+        )
 
         user = cur.fetchone()
         conn.close()
 
         if not user:
             st.error("Invalid email or password")
+            return
+
+        if user[5] == 0:
+            st.error("User is disabled. Contact admin.")
             return
 
         st.session_state.user_id = user[0]

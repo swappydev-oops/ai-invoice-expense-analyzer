@@ -24,42 +24,42 @@ def get_all_companies(include_inactive=True):
     return rows
 
 
-def create_company(name, gst_number, plan):
-    conn = get_conn()
-    cur = conn.cursor()
+# def create_company(name, gst_number, plan):
+#     conn = get_conn()
+#     cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO companies (name, gst_number, plan, is_active)
-        VALUES (?, ?, ?, 1)
-    """, (name, gst_number, plan))
+#     cur.execute("""
+#         INSERT INTO companies (name, gst_number, plan, is_active)
+#         VALUES (?, ?, ?, 1)
+#     """, (name, gst_number, plan))
 
-    conn.commit()
-    conn.close()
-
-
-def update_company(company_id, name, gst_number, plan):
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE companies
-        SET name = ?, gst_number = ?, plan = ?
-        WHERE id = ?
-    """, (name, gst_number, plan, company_id))
-
-    conn.commit()
-    conn.close()
+#     conn.commit()
+#     conn.close()
 
 
-def set_company_active(company_id, is_active):
-    conn = get_conn()
-    cur = conn.cursor()
+# def update_company(company_id, name, gst_number, plan):
+#     conn = get_conn()
+#     cur = conn.cursor()
 
-    cur.execute("""
-        UPDATE companies
-        SET is_active = ?
-        WHERE id = ?
-    """, (is_active, company_id))
+#     cur.execute("""
+#         UPDATE companies
+#         SET name = ?, gst_number = ?, plan = ?
+#         WHERE id = ?
+#     """, (name, gst_number, plan, company_id))
 
-    conn.commit()
-    conn.close()
+#     conn.commit()
+#     conn.close()
+
+
+# def set_company_active(company_id, is_active):
+#     conn = get_conn()
+#     cur = conn.cursor()
+
+#     cur.execute("""
+#         UPDATE companies
+#         SET is_active = ?
+#         WHERE id = ?
+#     """, (is_active, company_id))
+
+#     conn.commit()
+#     conn.close()
