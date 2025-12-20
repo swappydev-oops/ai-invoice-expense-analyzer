@@ -27,7 +27,7 @@ def login_ui():
                 is_active
             FROM users
             WHERE email = %s AND password_hash = %s
-        """, (email, hash_password(password)))
+        """, (email, password))
 
         user = cur.fetchone()
         conn.close()
