@@ -17,14 +17,17 @@ def login_ui():
         conn = get_conn()
         cur = conn.cursor()
 
-        cur.execute(
-            """
-            SELECT id, email, company_id, role, plan, is_active
+        cur.execute("""
+            SELECT
+                id,
+                user_name,
+                email,
+                company_id,
+                role,
+                is_active
             FROM users
-            WHERE email = ? AND password_hash = ?
-            """,
-            (email, hash_password(password))
-        )
+            WHERE email = %s AND password_hash = %s
+        """, (email, hash_password(password)))
 
         user = cur.fetchone()
         conn.close()
@@ -33,16 +36,15 @@ def login_ui():
             st.error("Invalid email or password")
             return
 
-        if user[5] == 0:
-            st.error("User is disabled. Contact admin.")
+        if not user["is_active"]:
+            st.error("User is inactive. Contact admin.")
             return
 
-        st.session_state.user_id = user[0]
-        st.session_state.user_email = user[1]
-        st.session_state.company_id = user[2]
-        st.session_state.role = user[3]
-        st.session_state.plan = user[4]
-        st.session_state.page = "dashboard"
+        st.session_state.user_id = user["id"]
+        st.session_state.user_name = user["user_name"]
+        st.session_state.user_email = user["email"]
+        st.session_state.company_id = user["company_id"]
+        st.session_state.role = user["role"]
 
         st.success("Login successful 🎉")
         st.rerun()
